@@ -1,4 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net48</TargetFramework>
@@ -11,13 +12,17 @@
     <AssemblyTitle>SwiftFind</AssemblyTitle>
     <Product>SwiftFind</Product>
     <Company>Bravo Company Cyber</Company>
-    <Description>Professional instant desktop search and Explorer-like file manager for Windows 8Ã¢â‚¬â€œ11</Description>
-    <Copyright>Copyright Ã‚Â© 2026</Copyright>
-    <Version>2.5.1</Version>
-    <FileVersion>2.5.1</FileVersion>
+    <Description>Professional instant desktop search and Explorer-like file manager for Windows 8–11</Description>
+    <Copyright>Copyright © 2026</Copyright>
+    <Version>2.6.0</Version>
+    <FileVersion>2.6.0</FileVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <OutputPath>$(MSBuildThisFileDirectory)..\..\</OutputPath>
+    <!-- Application icon (place SwiftFind.ico in assets/ or project root) -->
+    <ApplicationIcon Condition="Exists('..\..\assets\SwiftFind.ico')">..\..\assets\SwiftFind.ico</ApplicationIcon>
+    <ApplicationIcon Condition="Exists('SwiftFind.ico')">SwiftFind.ico</ApplicationIcon>
   </PropertyGroup>
+
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -25,9 +30,17 @@
     <Reference Include="System.Windows.Forms" />
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
+
   <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="SwiftFind.cs" />
+    <Compile Include="Models\FileEntry.cs" />
+    <Compile Include="Models\AppSettings.cs" />
+    <Compile Include="Indexing\UsnIndexer.cs" />
+    <Compile Include="Indexing\RecursiveIndexer.cs" />
+    <Compile Include="Search\SearchEngine.cs" />
+    <Compile Include="Forms\PreferencesForm.cs" />
+    <Compile Include="Helpers\AppIcon.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Remove="NativeMftProbe.cs" />
-  </ItemGroup>
+
 </Project>

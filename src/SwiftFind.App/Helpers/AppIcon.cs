@@ -7,7 +7,8 @@ using System.Runtime.InteropServices;
 namespace SwiftFind.Helpers
 {
     /// <summary>
-    /// Clean professional application icon — just the letter S.
+    /// Premium runtime application icon for SwiftFind.
+    /// Geometric engineered mark: speed + precision aperture.
     /// </summary>
     public static class AppIcon
     {
@@ -20,46 +21,34 @@ namespace SwiftFind.Helpers
                 {
                     g.SmoothingMode = SmoothingMode.AntiAlias;
                     g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-                    g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
                     g.Clear(Color.Transparent);
 
-                    // Modern rounded square
-                    using (var path = RoundedRect(12, 12, 232, 232, 52))
+                    // Blue rounded plate
+                    using (var path = RoundedRect(14, 14, 228, 228, 52))
                     using (var brush = new LinearGradientBrush(
-                        new Rectangle(12, 12, 232, 232),
-                        Color.FromArgb(55, 110, 240),
-                        Color.FromArgb(30, 70, 190),
-                        140f))
+                        new Rectangle(14, 14, 228, 228),
+                        Color.FromArgb(48, 110, 240),
+                        Color.FromArgb(28, 78, 200),
+                        145f))
                     {
                         g.FillPath(brush, path);
                     }
 
-                    // Subtle highlight
-                    using (var path = RoundedRect(24, 24, 208, 80, 40))
-                    using (var brush = new SolidBrush(Color.FromArgb(35, 255, 255, 255)))
+                    // Soft top glass
+                    using (var path = RoundedRect(26, 26, 204, 90, 40))
+                    using (var brush = new SolidBrush(Color.FromArgb(38, 255, 255, 255)))
                     {
                         g.FillPath(brush, path);
                     }
 
-                    // Bold white letter S
-                    using (var font = new Font("Segoe UI", 128f, FontStyle.Bold))
-                    using (var brush = new SolidBrush(Color.White))
-                    {
-                        var sf = new StringFormat
-                        {
-                            Alignment = StringAlignment.Center,
-                            LineAlignment = StringAlignment.Center
-                        };
-                        g.DrawString("S", font, brush, new RectangleF(0, 4, 256, 256), sf);
-                    }
+                    // Symbol
+                    DrawSymbol(g, 128, 128, 78, Color.White);
 
                     IntPtr hIcon = bmp.GetHicon();
                     try
                     {
                         using (Icon temp = Icon.FromHandle(hIcon))
-                        {
                             return (Icon)temp.Clone();
-                        }
                     }
                     finally
                     {
@@ -70,6 +59,56 @@ namespace SwiftFind.Helpers
             catch
             {
                 return SystemIcons.Application;
+            }
+        }
+
+        static void DrawSymbol(Graphics g, float cx, float cy, float scale, Color color)
+        {
+            using (var pen = new Pen(color, Math.Max(2f, scale * 0.24f)))
+            {
+                pen.StartCap = LineCap.Round;
+                pen.EndCap = LineCap.Round;
+                pen.LineJoin = LineJoin.Round;
+
+                // Geometric S
+                g.DrawLines(pen, new[]
+                {
+                    new PointF(cx - scale*0.70f, cy - scale*0.50f),
+                    new PointF(cx + scale*0.32f, cy - scale*0.50f),
+                    new PointF(cx + scale*0.52f, cy - scale*0.18f),
+                    new PointF(cx - scale*0.48f, cy + scale*0.20f),
+                    new PointF(cx - scale*0.28f, cy + scale*0.50f),
+                    new PointF(cx + scale*0.72f, cy + scale*0.50f),
+                });
+            }
+
+            // Aperture
+            float ax = cx + scale * 0.55f;
+            float ay = cy - scale * 0.02f;
+            float outer = scale * 0.34f;
+            float inner = scale * 0.12f;
+
+            using (var pen = new Pen(color, Math.Max(2f, scale * 0.20f)))
+            {
+                g.DrawEllipse(pen, ax - outer, ay - outer, outer * 2, outer * 2);
+            }
+            using (var brush = new SolidBrush(color))
+            {
+                g.FillEllipse(brush, ax - inner, ay - inner, inner * 2, inner * 2);
+            }
+
+            // Speed notch
+            float ch = scale * 0.16f;
+            float cx0 = cx - scale * 0.88f;
+            using (var brush = new SolidBrush(color))
+            {
+                g.FillPolygon(brush, new[]
+                {
+                    new PointF(cx0, cy),
+                    new PointF(cx0 + ch, cy - ch*0.85f),
+                    new PointF(cx0 + ch*0.5f, cy),
+                    new PointF(cx0 + ch, cy + ch*0.85f),
+                });
             }
         }
 
