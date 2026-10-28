@@ -7,9 +7,13 @@ namespace SwiftFind.Indexing
 {
     public static class RecursiveIndexer
     {
-        public static List<FileEntry> Index(string rootPath, Action<int> progress = null, HashSet<string> excludes = null)
+        public static List<FileEntry> Index(
+            string rootPath,
+            Action<int> progress = null,
+            HashSet<string> excludeFolders = null,
+            HashSet<string> excludeExtensions = null)
         {
-            var found = new List<FileEntry>(64000);
+            var found = new List<FileEntry>(128000);
             var stack = new Stack<string>();
             stack.Push(rootPath);
             int count = 0;
@@ -18,7 +22,11 @@ namespace SwiftFind.Indexing
             {
                 string dir = stack.Pop();
 
-                if (excludes != null && excludes.Contains(dir))
+                if (excludeFolders != null && excludeFolders.Contains(dir))
+                    continue;
+
+                // Also skip if any parent is excluded (simple prefix check)
+                if (excludeFolders != null && IsUnderExcluded(dir, excludeFolders))
                     continue;
 
                 try
@@ -27,6 +35,10 @@ namespace SwiftFind.Indexing
                     {
                         try
                         {
+                            string ext = Path.GetExtension(file).ToLowerInvariant();
+                            if (excludeExtensions != null && excludeExtensions.Contains(ext))
+                                continue;
+
                             var fi = new FileInfo(file);
                             found.Add(new FileEntry
                             {
@@ -38,10 +50,10 @@ namespace SwiftFind.Indexing
                                 IsDirectory = false
                             });
                             count++;
-                            if (progress != null && count % 2000 == 0)
+                            if (progress != null && count % 2500 == 0)
                                 progress(count);
                         }
-                        catch { }
+                        catch { /* skip locked / permission files */ }
                     }
 
                     foreach (string sub in Directory.GetDirectories(dir))
@@ -52,7 +64,8 @@ namespace SwiftFind.Indexing
                             if ((di.Attributes & FileAttributes.ReparsePoint) != 0)
                                 continue;
 
-                            if (excludes != null && excludes.Contains(sub))
+                            if (excludeFolders != null &&
+                                (excludeFolders.Contains(sub) || IsUnderExcluded(sub, excludeFolders)))
                                 continue;
 
                             found.Add(new FileEntry
@@ -70,10 +83,21 @@ namespace SwiftFind.Indexing
                         catch { }
                     }
                 }
-                catch { }
+                catch { /* skip inaccessible directories */ }
             }
 
             return found;
+        }
+
+        static bool IsUnderExcluded(string path, HashSet<string> excludes)
+        {
+            foreach (string ex in excludes)
+            {
+                if (path.StartsWith(ex.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase) ||
+                    path.Equals(ex, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
         }
     }
 }
