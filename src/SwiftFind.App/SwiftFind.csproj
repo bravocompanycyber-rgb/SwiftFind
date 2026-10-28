@@ -9,6 +9,7 @@
     <LangVersion>7.3</LangVersion>
     <Nullable>disable</Nullable>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <StartupObject>SwiftFind.Program</StartupObject>
     <AssemblyTitle>SwiftFind</AssemblyTitle>
     <Product>SwiftFind</Product>
     <Company>Bravo Company Cyber</Company>
@@ -20,6 +21,10 @@
     <OutputPath>$(MSBuildThisFileDirectory)..\..\</OutputPath>
     <ApplicationIcon Condition="Exists('..\..\assets\SwiftFind.ico')">..\..\assets\SwiftFind.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="NativeMftProbe.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <Reference Include="System" />
