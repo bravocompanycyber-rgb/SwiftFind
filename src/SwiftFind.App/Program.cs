@@ -11,15 +11,6 @@ namespace SwiftFind
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-
-            // Set a professional application icon early
-            try
-            {
-                var icon = AppIcon.Create();
-                // The main form will also pick it up
-            }
-            catch { }
-
             Application.Run(new MainForm());
         }
     }

@@ -8,7 +8,6 @@ namespace SwiftFind.Helpers
 {
     /// <summary>
     /// Clean professional application icon — just the letter S.
-    /// Original design, no external assets.
     /// </summary>
     public static class AppIcon
     {
@@ -24,7 +23,7 @@ namespace SwiftFind.Helpers
                     g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
                     g.Clear(Color.Transparent);
 
-                    // Modern rounded square background
+                    // Modern rounded square
                     using (var path = RoundedRect(12, 12, 232, 232, 52))
                     using (var brush = new LinearGradientBrush(
                         new Rectangle(12, 12, 232, 232),
@@ -35,14 +34,14 @@ namespace SwiftFind.Helpers
                         g.FillPath(brush, path);
                     }
 
-                    // Subtle top highlight
+                    // Subtle highlight
                     using (var path = RoundedRect(24, 24, 208, 80, 40))
                     using (var brush = new SolidBrush(Color.FromArgb(35, 255, 255, 255)))
                     {
                         g.FillPath(brush, path);
                     }
 
-                    // Bold letter S
+                    // Bold white letter S
                     using (var font = new Font("Segoe UI", 128f, FontStyle.Bold))
                     using (var brush = new SolidBrush(Color.White))
                     {
@@ -51,7 +50,6 @@ namespace SwiftFind.Helpers
                             Alignment = StringAlignment.Center,
                             LineAlignment = StringAlignment.Center
                         };
-                        // Slight vertical adjustment for optical centering
                         g.DrawString("S", font, brush, new RectangleF(0, 4, 256, 256), sf);
                     }
 
