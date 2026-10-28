@@ -24,10 +24,15 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Setup .NET SDK (for restore helpers)
+      - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Ensure assets folder
+        shell: pwsh
+        run: |
+          if (-not (Test-Path assets)) { New-Item -ItemType Directory -Path assets | Out-Null }
 
       - name: Build (Release)
         working-directory: src/SwiftFind.App
@@ -49,25 +54,12 @@ jobs:
         run: |
           $stage = "release-package"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
-
-          # Main binary
           Copy-Item "${{ steps.locate.outputs.exe_path }}" "$stage/SwiftFind.exe"
-
-          # Config if present
           $cfg = Join-Path "${{ steps.locate.outputs.exe_dir }}" "SwiftFind.exe.config"
           if (Test-Path $cfg) { Copy-Item $cfg "$stage/" }
-
-          # Icon
-          if (Test-Path "assets/SwiftFind.ico") {
-            Copy-Item "assets/SwiftFind.ico" "$stage/"
-          }
-
-          # README
+          if (Test-Path "assets/SwiftFind.ico") { Copy-Item "assets/SwiftFind.ico" "$stage/" }
           if (Test-Path "README.md") { Copy-Item "README.md" "$stage/" }
-
-          # Portable marker (optional convenience)
           "" | Out-File -FilePath "$stage/SwiftFind.portable" -Encoding ascii
-
           Get-ChildItem $stage | Format-Table Name, Length
 
       - name: Create ZIP package
@@ -98,7 +90,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Optional: also produce a portable folder artifact
   package-info:
     runs-on: ubuntu-latest
     needs: build
@@ -110,5 +101,4 @@ jobs:
           echo "- Artifact: **SwiftFind-windows-x64**" >> $GITHUB_STEP_SUMMARY
           echo "- Download from the Actions run or from Releases (when tagged)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "To publish a release, push a tag:" >> $GITHUB_STEP_SUMMARY
-          echo "\`git tag v2.6.0 && git push origin v2.6.0\`" >> $GITHUB_STEP_SUMMARY
+          echo "To publish a release: \`git tag v2.6.0 && git push origin v2.6.0\`" >> $GITHUB_STEP_SUMMARY
