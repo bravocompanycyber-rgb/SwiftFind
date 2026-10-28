@@ -1,119 +1,64 @@
 # SwiftFind
 
-**Professional instant desktop search + Explorer-like file manager for Windows**
+**Professional instant desktop search & Explorer-like file manager for Windows 8 – 11**
 
-Find anything in milliseconds. Then act on it — open, rename, delete, copy, cut, paste, new folder, drag-out, favorites — without leaving the window.
+SwiftFind is a fast, modern, crash-hardened file search utility with full file management capabilities. Built for speed, clarity, and control.
 
-Built for **Windows 8 / 8.1 through Windows 11**. Optional **USN Journal fast path** on NTFS. Fully configurable exclusions, grouping, color coding and preferences.
+![SwiftFind](assets/symbol_512.png)
 
----
+## Features
 
-## Why teams and power users choose SwiftFind
+- **Instant real-time search** — results as you type
+- **Dual indexing** — optional NTFS USN Journal path (Everything-style speed) + solid recursive fallback
+- **Explorer-like actions** — open, rename, delete, copy / cut / paste, multi-select
+- **Advanced query syntax** — `ext:`, `size:>`, `dm:`, wildcards, regex
+- **Preferences & exclusions** — exclude folders and file types you choose
+- **Grouping & color coding** — by extension, folder, modified date, size
+- **Favorites, portable mode, persistent cache**
+- **Windows 8 / 8.1 / 10 / 11** via .NET Framework 4.8
 
-Most search tools stop at “find it”.  
-SwiftFind continues: **find it → work with it**.
+## Download
 
-| Capability | SwiftFind | Typical alternatives |
-|------------|-----------|----------------------|
-| Instant name + path search | Yes | Yes |
-| Full in-app file management | **Yes** | Rare / limited |
-| Multi-select, drag-out, clipboard interop | **Yes** | Partial |
-| User-defined folder & extension exclusions | **Yes** | Limited |
-| Grouping (Extension / Folder / Date / Size) | **Yes** | Rare |
-| Color coding (folders, favorites, large, recent) | **Yes** | Rare |
-| Preferences dialog + persistent settings | **Yes** | Varies |
-| USN fast path + recursive fallback | **Yes** | Specialized tools only |
-| Professional menu system (File / Edit / View / Tools) | **Yes** | Basic or none |
-| Portable mode | **Yes** | Some |
-| Windows 8 → 11, single EXE, no heavy runtime | **Yes** | Varies |
+Official builds are produced automatically by GitHub Actions.
 
----
+1. Go to **Actions** → latest successful run → **Artifacts** → `SwiftFind-windows-x64`
+2. Or download from **Releases** (created when a version tag is pushed)
 
-## Highlights
+```bash
+git tag v2.6.0
+git push origin v2.6.0
+```
 
-### Search that stays out of your way
-- Live results as you type
-- Advanced operators: `ext:pdf`, `size:>10MB`, `dm:week`, wildcards, `regex:`
-- Click any column to sort
-- Group results by extension, folder, modified date or size range
-
-### Real file management
-- Open / Open location
-- Rename (F2), Delete, New folder
-- Copy / Cut / Paste with Explorer interop
-- Drag selected items straight into Explorer or other apps
-- Multi-select and Select All
-
-### Control & polish
-- **Preferences** (Ctrl+,) — exclusions, grouping defaults, color coding, max results, auto-index
-- Exclude any folders and file types from the index
-- Favorites (★ / Ctrl+D)
-- Color coding: folders, favorites, large files (>100 MB), recent files
-- Dark professional UI with proper menu bar
-- Crash-hardened paths and background indexing
-
----
-
-## Quick start
+## Build from source
 
 ```powershell
-# Modern
 cd src\SwiftFind.App
+msbuild SwiftFind.csproj /p:Configuration=Release
+# or
 dotnet build -c Release
-
-# Or classic script
-.\scripts\Build.ps1
-
-.\SwiftFind.exe
 ```
 
-1. **Choose folder** (or whole drive)
-2. Open **Tools → Preferences** and set exclusions (highly recommended)
-3. **Build index** (USN is tried first on NTFS)
-4. Type to search. Right-click or use shortcuts to manage files.
+Requirements: Visual Studio 2019/2022 or Build Tools with .NET Framework 4.8 targeting pack.
 
----
+## Application icon
 
-## Keyboard shortcuts
+Place `assets/SwiftFind.ico` in the repository (multi-resolution 16–256).  
+The project also embeds a runtime-generated matching icon so the window always looks correct.
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+F` | Focus search |
-| `Ctrl+R` | Rebuild index |
-| `Ctrl+,` | Preferences |
-| `Ctrl+D` | Add to Favorites |
-| `Enter` | Open |
-| `F2` | Rename |
-| `Delete` | Delete |
-| `Ctrl+C / X / V` | Copy / Cut / Paste |
-| `Ctrl+A` | Select all visible |
-| `Esc` | Clear search |
-
----
-
-## Query examples
+## Project layout
 
 ```
-report
-*2024*.pdf
-ext:pdf size:>5MB
-dm:week invoice
-regex:^Draft.*\.docx$
+src/SwiftFind.App/     # Main WinForms application
+  Helpers/AppIcon.cs   # Premium runtime icon
+  Indexing/            # USN + Recursive indexers
+  Search/              # Query engine
+  Forms/               # Preferences dialog
+  Models/              # FileEntry, AppSettings
+assets/                # Brand assets & .ico
+.github/workflows/     # CI build & release
+scripts/               # Build helpers
 ```
-
----
-
-## Technical
-
-- **Target**: .NET Framework 4.8 (Windows 8+ compatible APIs)
-- **Indexing**: USN Journal when available → recursive walk with exclusions otherwise
-- **Settings & cache**: `%LocalAppData%\SwiftFind` or next to EXE in portable mode
-- **No external dependencies**, no installer required for basic use
-
----
 
 ## License
 
-MIT — free for personal and commercial use.
-
-**SwiftFind** — professional search that lets you finish the job.
+Copyright © 2026 Bravo Company Cyber. All rights reserved.
