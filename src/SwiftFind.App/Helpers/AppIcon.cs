@@ -2,14 +2,13 @@ using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
-using System.IO;
 using System.Runtime.InteropServices;
 
 namespace SwiftFind.Helpers
 {
     /// <summary>
-    /// Generates a clean, original professional application icon at runtime.
-    /// No external assets, no copyright issues.
+    /// Clean professional application icon — just the letter S.
+    /// Original design, no external assets.
     /// </summary>
     public static class AppIcon
     {
@@ -17,68 +16,52 @@ namespace SwiftFind.Helpers
         {
             try
             {
-                // Create multi-resolution feel by drawing at 256 then letting system scale
                 using (var bmp = new Bitmap(256, 256, PixelFormat.Format32bppArgb))
                 using (var g = Graphics.FromImage(bmp))
                 {
                     g.SmoothingMode = SmoothingMode.AntiAlias;
                     g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                    g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
                     g.Clear(Color.Transparent);
 
-                    // Background rounded square (modern app icon style)
-                    using (var path = RoundedRect(16, 16, 224, 224, 48))
+                    // Modern rounded square background
+                    using (var path = RoundedRect(12, 12, 232, 232, 52))
                     using (var brush = new LinearGradientBrush(
-                        new Rectangle(16, 16, 224, 224),
-                        Color.FromArgb(45, 95, 220),
-                        Color.FromArgb(30, 60, 160),
-                        135f))
+                        new Rectangle(12, 12, 232, 232),
+                        Color.FromArgb(55, 110, 240),
+                        Color.FromArgb(30, 70, 190),
+                        140f))
                     {
                         g.FillPath(brush, path);
                     }
 
-                    // Soft inner highlight
-                    using (var path = RoundedRect(28, 28, 200, 90, 36))
-                    using (var brush = new SolidBrush(Color.FromArgb(40, 255, 255, 255)))
+                    // Subtle top highlight
+                    using (var path = RoundedRect(24, 24, 208, 80, 40))
+                    using (var brush = new SolidBrush(Color.FromArgb(35, 255, 255, 255)))
                     {
                         g.FillPath(brush, path);
                     }
 
-                    // Magnifying glass circle
-                    using (var pen = new Pen(Color.White, 14f))
-                    {
-                        pen.StartCap = LineCap.Round;
-                        pen.EndCap = LineCap.Round;
-                        g.DrawEllipse(pen, 68, 58, 100, 100);
-                    }
-
-                    // Magnifying glass handle
-                    using (var pen = new Pen(Color.White, 14f))
-                    {
-                        pen.StartCap = LineCap.Round;
-                        pen.EndCap = LineCap.Round;
-                        g.DrawLine(pen, 148, 148, 190, 190);
-                    }
-
-                    // Small "S" accent in the lens for brand
-                    using (var font = new Font("Segoe UI", 42f, FontStyle.Bold))
-                    using (var brush = new SolidBrush(Color.FromArgb(230, 255, 255, 255)))
+                    // Bold letter S
+                    using (var font = new Font("Segoe UI", 128f, FontStyle.Bold))
+                    using (var brush = new SolidBrush(Color.White))
                     {
                         var sf = new StringFormat
                         {
                             Alignment = StringAlignment.Center,
                             LineAlignment = StringAlignment.Center
                         };
-                        g.DrawString("S", font, brush, new RectangleF(68, 58, 100, 100), sf);
+                        // Slight vertical adjustment for optical centering
+                        g.DrawString("S", font, brush, new RectangleF(0, 4, 256, 256), sf);
                     }
 
-                    // Convert to Icon
                     IntPtr hIcon = bmp.GetHicon();
                     try
                     {
-                        Icon temp = Icon.FromHandle(hIcon);
-                        // Clone so we can destroy the handle
-                        Icon result = (Icon)temp.Clone();
-                        return result;
+                        using (Icon temp = Icon.FromHandle(hIcon))
+                        {
+                            return (Icon)temp.Clone();
+                        }
                     }
                     finally
                     {
@@ -88,7 +71,6 @@ namespace SwiftFind.Helpers
             }
             catch
             {
-                // Fallback: simple system icon
                 return SystemIcons.Application;
             }
         }
