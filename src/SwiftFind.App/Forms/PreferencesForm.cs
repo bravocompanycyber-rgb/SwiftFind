@@ -27,8 +27,8 @@ namespace SwiftFind.Forms
         {
             settings = current;
             Text = "Preferences — SwiftFind";
-            Size = new Size(620, 560);
-            MinimumSize = new Size(560, 480);
+            Size = new Size(640, 580);
+            MinimumSize = new Size(580, 500);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
@@ -44,21 +44,20 @@ namespace SwiftFind.Forms
         void BuildUI()
         {
             var tabs = new TabControl { Dock = DockStyle.Fill, Padding = new Point(8, 8) };
-            tabs.Font = new Font("Segoe UI", 9.5f);
 
-            // --- General tab ---
+            // General
             var tabGeneral = new TabPage("General") { BackColor = Bg, ForeColor = Color.White };
-            var pGen = new Panel { Dock = DockStyle.Fill, Padding = new Padding(16), BackColor = Bg };
+            var pGen = new Panel { Dock = DockStyle.Fill, Padding = new Padding(18), BackColor = Bg };
 
             chkAutoIndex = MakeCheck("Automatically build index when SwiftFind starts");
             chkFoldersFirst = MakeCheck("Show folders before files in results");
             chkColorCode = MakeCheck("Enable color coding (folders, favorites, large files, recent)");
             chkMatchPath = MakeCheck("Match search terms against full path (not only file name)");
 
-            var lblMax = new Label { Text = "Maximum results to display:", AutoSize = true, Top = 0 };
+            var lblMax = new Label { Text = "Maximum results to display:", AutoSize = true };
             numMaxResults = new NumericUpDown
             {
-                Minimum = 500, Maximum = 50000, Value = 10000, Width = 100,
+                Minimum = 500, Maximum = 50000, Value = 10000, Width = 110,
                 BackColor = Surface, ForeColor = Color.White
             };
 
@@ -70,34 +69,36 @@ namespace SwiftFind.Forms
             };
             cmbGroupBy.Items.AddRange(new object[] { "None", "Extension", "Folder", "Modified", "Size" });
 
-            int y = 12;
-            pGen.Controls.Add(chkAutoIndex); chkAutoIndex.Top = y; y += 32;
-            pGen.Controls.Add(chkFoldersFirst); chkFoldersFirst.Top = y; y += 32;
-            pGen.Controls.Add(chkColorCode); chkColorCode.Top = y; y += 32;
-            pGen.Controls.Add(chkMatchPath); chkMatchPath.Top = y; y += 40;
-            pGen.Controls.Add(lblMax); lblMax.Top = y; lblMax.Left = 0;
-            pGen.Controls.Add(numMaxResults); numMaxResults.Top = y - 2; numMaxResults.Left = 200; y += 40;
-            pGen.Controls.Add(lblGroup); lblGroup.Top = y; lblGroup.Left = 0;
-            pGen.Controls.Add(cmbGroupBy); cmbGroupBy.Top = y - 2; cmbGroupBy.Left = 200;
+            int y = 14;
+            foreach (var c in new Control[] { chkAutoIndex, chkFoldersFirst, chkColorCode, chkMatchPath })
+            {
+                c.Top = y; c.Left = 0; pGen.Controls.Add(c); y += 34;
+            }
+            y += 8;
+            lblMax.Top = y; lblMax.Left = 0; pGen.Controls.Add(lblMax);
+            numMaxResults.Top = y - 2; numMaxResults.Left = 210; pGen.Controls.Add(numMaxResults);
+            y += 42;
+            lblGroup.Top = y; lblGroup.Left = 0; pGen.Controls.Add(lblGroup);
+            cmbGroupBy.Top = y - 2; cmbGroupBy.Left = 210; pGen.Controls.Add(cmbGroupBy);
 
             tabGeneral.Controls.Add(pGen);
             tabs.TabPages.Add(tabGeneral);
 
-            // --- Exclusions tab ---
+            // Exclusions
             var tabEx = new TabPage("Exclusions") { BackColor = Bg, ForeColor = Color.White };
             var pEx = new TableLayoutPanel
             {
-                Dock = DockStyle.Fill, Padding = new Padding(12),
+                Dock = DockStyle.Fill, Padding = new Padding(14),
                 ColumnCount = 2, RowCount = 4, BackColor = Bg
             };
             pEx.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55));
             pEx.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
             pEx.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
-            pEx.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
-            pEx.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
-            pEx.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            pEx.RowStyles.Add(new RowStyle(SizeType.Percent, 52));
+            pEx.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
+            pEx.RowStyles.Add(new RowStyle(SizeType.Percent, 48));
 
-            pEx.Controls.Add(new Label { Text = "Excluded folders (not indexed)", Dock = DockStyle.Fill, ForeColor = Color.Silver }, 0, 0);
+            pEx.Controls.Add(new Label { Text = "Excluded folders (skipped during index)", Dock = DockStyle.Fill, ForeColor = Color.Silver }, 0, 0);
             pEx.Controls.Add(new Label { Text = "Excluded extensions", Dock = DockStyle.Fill, ForeColor = Color.Silver }, 1, 0);
 
             lstFolders = new ListBox { Dock = DockStyle.Fill, BackColor = Surface, ForeColor = Color.White, BorderStyle = BorderStyle.FixedSingle };
@@ -120,10 +121,9 @@ namespace SwiftFind.Forms
             pEx.Controls.Add(panelFolderBtns, 0, 2);
             pEx.Controls.Add(panelExtBtns, 1, 2);
 
-            // Common excludes helper
             var lblHint = new Label
             {
-                Text = "Tip: Common system folders and temp extensions are good candidates for exclusion. Changes apply on next index build.",
+                Text = "Tip: Exclude Windows, Program Files, node_modules, .git, temp folders and extensions like .tmp .log .cache for faster, cleaner indexes. Changes apply on the next Build index.",
                 Dock = DockStyle.Fill, ForeColor = Color.FromArgb(140, 150, 170)
             };
             pEx.Controls.Add(lblHint, 0, 3);
@@ -138,52 +138,44 @@ namespace SwiftFind.Forms
                         lstFolders.Items.Add(d.SelectedPath);
                 }
             };
-            btnRemFolder.Click += (s, e) =>
-            {
-                if (lstFolders.SelectedIndex >= 0) lstFolders.Items.RemoveAt(lstFolders.SelectedIndex);
-            };
+            btnRemFolder.Click += (s, e) => { if (lstFolders.SelectedIndex >= 0) lstFolders.Items.RemoveAt(lstFolders.SelectedIndex); };
             btnAddExt.Click += (s, e) =>
             {
-                string input = Microsoft.VisualBasic.Interaction.InputBox(
-                    "Enter extension (e.g. tmp or .log)", "Add excluded extension", ".tmp");
+                string input = SimpleInput("Add excluded extension", "Extension (e.g. tmp or .log):", ".tmp");
                 if (string.IsNullOrWhiteSpace(input)) return;
                 string ext = input.Trim().ToLowerInvariant();
                 if (!ext.StartsWith(".")) ext = "." + ext;
                 if (!lstExts.Items.Contains(ext)) lstExts.Items.Add(ext);
             };
-            btnRemExt.Click += (s, e) =>
-            {
-                if (lstExts.SelectedIndex >= 0) lstExts.Items.RemoveAt(lstExts.SelectedIndex);
-            };
+            btnRemExt.Click += (s, e) => { if (lstExts.SelectedIndex >= 0) lstExts.Items.RemoveAt(lstExts.SelectedIndex); };
 
             tabEx.Controls.Add(pEx);
             tabs.TabPages.Add(tabEx);
 
-            // Buttons
-            var bottom = new Panel { Dock = DockStyle.Bottom, Height = 52, BackColor = Bg, Padding = new Padding(12) };
+            // Bottom buttons
+            var bottom = new Panel { Dock = DockStyle.Bottom, Height = 54, BackColor = Bg, Padding = new Padding(14) };
             var btnOk = new Button
             {
                 Text = "Save", Width = 100, Height = 32, DialogResult = DialogResult.OK,
                 BackColor = Accent, ForeColor = Color.White, FlatStyle = FlatStyle.Flat,
-                Anchor = AnchorStyles.Right
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
             btnOk.FlatAppearance.BorderSize = 0;
-            btnOk.Location = new Point(bottom.Width - 220, 10);
             var btnCancel = new Button
             {
                 Text = "Cancel", Width = 90, Height = 32, DialogResult = DialogResult.Cancel,
                 BackColor = Surface, ForeColor = Color.White, FlatStyle = FlatStyle.Flat,
-                Anchor = AnchorStyles.Right
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
             btnCancel.FlatAppearance.BorderSize = 0;
-            btnCancel.Location = new Point(bottom.Width - 110, 10);
 
             bottom.Controls.Add(btnOk);
             bottom.Controls.Add(btnCancel);
             bottom.Resize += (s, e) =>
             {
-                btnOk.Left = bottom.ClientSize.Width - 220;
-                btnCancel.Left = bottom.ClientSize.Width - 110;
+                btnOk.Left = bottom.ClientSize.Width - 210;
+                btnCancel.Left = bottom.ClientSize.Width - 100;
+                btnOk.Top = btnCancel.Top = 10;
             };
 
             Controls.Add(tabs);
@@ -199,7 +191,7 @@ namespace SwiftFind.Forms
             return new CheckBox
             {
                 Text = text, AutoSize = true, ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat, Left = 0
+                FlatStyle = FlatStyle.Flat
             };
         }
 
@@ -207,7 +199,7 @@ namespace SwiftFind.Forms
         {
             var b = new Button
             {
-                Text = text, Width = 110, Height = 28,
+                Text = text, Width = 114, Height = 28,
                 BackColor = Surface, ForeColor = Color.White, FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand, Margin = new Padding(0, 0, 8, 0)
             };
@@ -231,7 +223,6 @@ namespace SwiftFind.Forms
             lstExts.Items.Clear();
             foreach (string e in settings.ExcludeExtensions) lstExts.Items.Add(e);
 
-            // Sensible defaults if empty
             if (lstExts.Items.Count == 0)
             {
                 foreach (string d in new[] { ".tmp", ".temp", ".log", ".bak", ".old", ".cache" })
@@ -247,13 +238,50 @@ namespace SwiftFind.Forms
             settings.MatchPath = chkMatchPath.Checked;
             settings.MaxResults = (int)numMaxResults.Value;
             settings.GroupBy = cmbGroupBy.SelectedItem as string ?? "None";
-
             settings.ExcludeFolders = lstFolders.Items.Cast<string>().ToList();
             settings.ExcludeExtensions = lstExts.Items.Cast<string>().ToList();
-
             settings.Save();
             DialogResult = DialogResult.OK;
             Close();
+        }
+
+        static string SimpleInput(string title, string prompt, string defaultValue)
+        {
+            using (var form = new Form())
+            {
+                form.Text = title;
+                form.Size = new Size(400, 150);
+                form.StartPosition = FormStartPosition.CenterParent;
+                form.FormBorderStyle = FormBorderStyle.FixedDialog;
+                form.MaximizeBox = false;
+                form.MinimizeBox = false;
+                form.BackColor = Bg;
+                form.ForeColor = Color.White;
+
+                var lbl = new Label { Text = prompt, Left = 14, Top = 14, AutoSize = true };
+                var tb = new TextBox
+                {
+                    Left = 14, Top = 40, Width = 350, Text = defaultValue,
+                    BackColor = Surface, ForeColor = Color.White, BorderStyle = BorderStyle.FixedSingle
+                };
+                var ok = new Button
+                {
+                    Text = "OK", Left = 200, Top = 78, Width = 80,
+                    DialogResult = DialogResult.OK, BackColor = Accent, ForeColor = Color.White, FlatStyle = FlatStyle.Flat
+                };
+                ok.FlatAppearance.BorderSize = 0;
+                var cancel = new Button
+                {
+                    Text = "Cancel", Left = 290, Top = 78, Width = 80,
+                    DialogResult = DialogResult.Cancel, BackColor = Surface, ForeColor = Color.White, FlatStyle = FlatStyle.Flat
+                };
+                cancel.FlatAppearance.BorderSize = 0;
+
+                form.Controls.AddRange(new Control[] { lbl, tb, ok, cancel });
+                form.AcceptButton = ok;
+                form.CancelButton = cancel;
+                return form.ShowDialog() == DialogResult.OK ? tb.Text.Trim() : null;
+            }
         }
     }
 }
