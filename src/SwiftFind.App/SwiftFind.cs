@@ -7,28 +7,12 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using SwiftFind.Indexing;
+using SwiftFind.Models;
+using SwiftFind.Search;
 
 namespace SwiftFind
 {
-    public class FileEntry
-    {
-        public string Name;
-        public string FullPath;
-        public string Directory;
-        public long Size;
-        public DateTime Modified;
-        public bool IsDirectory;
-
-        public string Extension
-        {
-            get
-            {
-                if (IsDirectory) return "";
-                return Path.GetExtension(Name).ToLowerInvariant();
-            }
-        }
-    }
-
     public class MainForm : Form
     {
         // UI
@@ -39,21 +23,33 @@ namespace SwiftFind
         Button btnChoose;
         Button btnIndex;
         Button btnClear;
+        Button btnFav;
         ComboBox filterExt;
         ComboBox filterSize;
         ComboBox filterDate;
         ProgressBar progressBar;
+        ToolStripStatusLabel methodLabel;
 
         // Data
         List<FileEntry> index = new List<FileEntry>();
         List<FileEntry> visible = new List<FileEntry>();
+        List<string> favorites = new List<string>();
+        List<string> recentQueries = new List<string>();
         string rootPath;
         string cachePath;
+        string favPath;
+        string settingsPath;
         bool isIndexing;
+        string lastIndexMethod = "none";
+        DateTime lastIndexTime = DateTime.MinValue;
 
-        // Clipboard for cut/copy
+        // Clipboard
         List<string> clipboardPaths = new List<string>();
         bool clipboardIsCut;
+
+        // Sort
+        int sortColumn = 0;
+        bool sortAsc = true;
 
         // Colors
         static readonly Color Bg = Color.FromArgb(18, 22, 32);
@@ -62,6 +58,7 @@ namespace SwiftFind
         static readonly Color Accent = Color.FromArgb(64, 120, 240);
         static readonly Color AccentGreen = Color.FromArgb(40, 160, 110);
         static readonly Color TextMuted = Color.FromArgb(160, 170, 190);
+        static readonly Color FavColor = Color.FromArgb(255, 200, 80);
 
         BackgroundWorker indexer = new BackgroundWorker();
         Timer searchTimer = new Timer();
@@ -69,8 +66,8 @@ namespace SwiftFind
         public MainForm()
         {
             Text = "SwiftFind";
-            Size = new Size(1280, 820);
-            MinimumSize = new Size(900, 560);
+            Size = new Size(1320, 860);
+            MinimumSize = new Size(960, 580);
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = Bg;
             ForeColor = Color.White;
@@ -83,8 +80,27 @@ namespace SwiftFind
                 "SwiftFind");
             Directory.CreateDirectory(dataDir);
             cachePath = Path.Combine(dataDir, "index.cache");
+            favPath = Path.Combine(dataDir, "favorites.txt");
+            settingsPath = Path.Combine(dataDir, "settings.txt");
+
+            // Portable mode: if settings.txt next to EXE, use that folder
+            try
+            {
+                string exeDir = AppDomain.CurrentDomain.BaseDirectory;
+                string portable = Path.Combine(exeDir, "SwiftFind.portable");
+                if (File.Exists(portable))
+                {
+                    dataDir = exeDir;
+                    cachePath = Path.Combine(dataDir, "index.cache");
+                    favPath = Path.Combine(dataDir, "favorites.txt");
+                    settingsPath = Path.Combine(dataDir, "settings.txt");
+                }
+            }
+            catch { }
 
             rootPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            LoadSettings();
+            LoadFavorites();
 
             BuildUI();
             WireEvents();
@@ -95,7 +111,7 @@ namespace SwiftFind
             indexer.ProgressChanged += Indexer_ProgressChanged;
             indexer.RunWorkerCompleted += Indexer_Completed;
 
-            searchTimer.Interval = 140;
+            searchTimer.Interval = 120;
             searchTimer.Tick += (s, e) => { searchTimer.Stop(); ApplySearch(); };
 
             LoadCache();
@@ -113,12 +129,12 @@ namespace SwiftFind
                 Padding = new Padding(16),
                 BackColor = Bg
             };
-            main.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));  // header
-            main.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));  // search
-            main.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));  // path + buttons
-            main.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));  // filters
-            main.RowStyles.Add(new RowStyle(SizeType.Percent, 100));  // list
-            main.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));  // status
+            main.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
+            main.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+            main.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+            main.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+            main.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            main.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
             Controls.Add(main);
 
             // Header
@@ -143,7 +159,7 @@ namespace SwiftFind
             };
             var subtitle = new Label
             {
-                Text = "Instant search  ·  File manager  ·  Windows 8 – 11",
+                Text = "Instant search  ·  File manager  ·  USN fast path  ·  Windows 8 – 11",
                 AutoSize = true,
                 Location = new Point(52, 34),
                 Font = new Font("Segoe UI", 8),
@@ -154,7 +170,7 @@ namespace SwiftFind
             header.Controls.Add(subtitle);
             main.Controls.Add(header, 0, 0);
 
-            // Search box
+            // Search
             queryBox = new TextBox
             {
                 Dock = DockStyle.Fill,
@@ -165,16 +181,17 @@ namespace SwiftFind
             };
             main.Controls.Add(queryBox, 0, 1);
 
-            // Path + action buttons
+            // Path bar
             var pathPanel = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                ColumnCount = 4,
+                ColumnCount = 5,
                 BackColor = Bg
             };
             pathPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            pathPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));
-            pathPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));
+            pathPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 118));
+            pathPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 118));
+            pathPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
             pathPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
 
             pathBox = new TextBox
@@ -189,11 +206,13 @@ namespace SwiftFind
             btnChoose = MakeButton("Choose folder", Accent);
             btnIndex = MakeButton("Build index", AccentGreen);
             btnClear = MakeButton("Clear", Surface2);
+            btnFav = MakeButton("★ Fav", Surface2);
 
             pathPanel.Controls.Add(pathBox, 0, 0);
             pathPanel.Controls.Add(btnChoose, 1, 0);
             pathPanel.Controls.Add(btnIndex, 2, 0);
             pathPanel.Controls.Add(btnClear, 3, 0);
+            pathPanel.Controls.Add(btnFav, 4, 0);
             main.Controls.Add(pathPanel, 0, 2);
 
             // Filters
@@ -207,7 +226,7 @@ namespace SwiftFind
 
             filterExt = MakeFilterCombo("Any type", new[] {
                 "Any type", ".exe", ".dll", ".txt", ".pdf", ".docx", ".xlsx",
-                ".jpg", ".png", ".mp4", ".mp3", ".zip", ".cs", ".js", ".html"
+                ".jpg", ".png", ".mp4", ".mp3", ".zip", ".cs", ".js", ".html", ".json"
             });
             filterSize = MakeFilterCombo("Any size", new[] {
                 "Any size", "Empty", "< 1 KB", "< 100 KB", "< 1 MB", "< 10 MB", "< 100 MB", "> 100 MB"
@@ -218,13 +237,23 @@ namespace SwiftFind
 
             filterPanel.Controls.Add(new Label { Text = "Type", AutoSize = true, ForeColor = TextMuted, Margin = new Padding(0, 8, 6, 0) });
             filterPanel.Controls.Add(filterExt);
-            filterPanel.Controls.Add(new Label { Text = "Size", AutoSize = true, ForeColor = TextMuted, Margin = new Padding(16, 8, 6, 0) });
+            filterPanel.Controls.Add(new Label { Text = "Size", AutoSize = true, ForeColor = TextMuted, Margin = new Padding(14, 8, 6, 0) });
             filterPanel.Controls.Add(filterSize);
-            filterPanel.Controls.Add(new Label { Text = "Modified", AutoSize = true, ForeColor = TextMuted, Margin = new Padding(16, 8, 6, 0) });
+            filterPanel.Controls.Add(new Label { Text = "Modified", AutoSize = true, ForeColor = TextMuted, Margin = new Padding(14, 8, 6, 0) });
             filterPanel.Controls.Add(filterDate);
+
+            var tip = new Label
+            {
+                Text = "  Tips:  ext:pdf   size:>10MB   dm:week   *report*   regex:",
+                AutoSize = true,
+                ForeColor = Color.FromArgb(120, 130, 150),
+                Margin = new Padding(18, 8, 0, 0),
+                Font = new Font("Segoe UI", 8f)
+            };
+            filterPanel.Controls.Add(tip);
             main.Controls.Add(filterPanel, 0, 3);
 
-            // Results ListView
+            // Results
             resultsView = new ListView
             {
                 Dock = DockStyle.Fill,
@@ -237,24 +266,22 @@ namespace SwiftFind
                 BorderStyle = BorderStyle.None,
                 Font = new Font("Segoe UI", 9.5f),
                 AllowDrop = true,
-                HeaderStyle = ColumnHeaderStyle.Nonclickable
+                HeaderStyle = ColumnHeaderStyle.Clickable
             };
-            resultsView.Columns.Add("Name", 320);
-            resultsView.Columns.Add("Location", 420);
+            resultsView.Columns.Add("Name", 340);
+            resultsView.Columns.Add("Location", 400);
             resultsView.Columns.Add("Size", 90);
             resultsView.Columns.Add("Modified", 140);
             resultsView.Columns.Add("Type", 70);
 
-            var menu = BuildContextMenu();
-            resultsView.ContextMenuStrip = menu;
+            resultsView.ContextMenuStrip = BuildContextMenu();
             main.Controls.Add(resultsView, 0, 4);
 
-            // Status bar
+            // Status
             var statusPanel = new Panel { Dock = DockStyle.Fill, BackColor = Bg };
             statusLabel = new Label
             {
-                Dock = DockStyle.Left,
-                Width = 700,
+                Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft,
                 ForeColor = TextMuted,
                 Text = "Ready"
@@ -262,8 +289,8 @@ namespace SwiftFind
             progressBar = new ProgressBar
             {
                 Dock = DockStyle.Right,
-                Width = 220,
-                Height = 16,
+                Width = 200,
+                Height = 14,
                 Style = ProgressBarStyle.Continuous,
                 Visible = false
             };
@@ -277,7 +304,7 @@ namespace SwiftFind
             var c = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Width = 120,
+                Width = 118,
                 BackColor = Surface,
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat
@@ -317,6 +344,7 @@ namespace SwiftFind
             menu.Items.Add("Rename", null, (s, e) => RenameSelected());
             menu.Items.Add("Delete", null, (s, e) => DeleteSelected());
             menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("Add to Favorites", null, (s, e) => AddFavorite());
             menu.Items.Add("New folder here", null, (s, e) => CreateNewFolder());
             menu.Items.Add("Copy full path", null, (s, e) => CopyPaths());
             menu.Items.Add("Properties", null, (s, e) => ShowProperties());
@@ -331,6 +359,7 @@ namespace SwiftFind
             btnChoose.Click += (s, e) => ChooseFolder();
             btnIndex.Click += (s, e) => StartIndexing();
             btnClear.Click += (s, e) => { queryBox.Clear(); queryBox.Focus(); };
+            btnFav.Click += (s, e) => ShowFavorites();
 
             filterExt.SelectedIndexChanged += (s, e) => ApplySearch();
             filterSize.SelectedIndexChanged += (s, e) => ApplySearch();
@@ -339,6 +368,7 @@ namespace SwiftFind
             resultsView.DoubleClick += (s, e) => OpenSelected(false);
             resultsView.KeyDown += ResultsView_KeyDown;
             resultsView.ItemDrag += ResultsView_ItemDrag;
+            resultsView.ColumnClick += ResultsView_ColumnClick;
 
             this.KeyDown += MainForm_KeyDown;
         }
@@ -377,7 +407,7 @@ namespace SwiftFind
                 foreach (ListViewItem item in resultsView.Items) item.Selected = true;
                 e.Handled = true;
             }
-            else if (e.KeyCode == Keys.Back || e.KeyCode == Keys.Up && resultsView.SelectedItems.Count == 0)
+            else if (e.KeyCode == Keys.Back)
             {
                 queryBox.Focus();
             }
@@ -396,6 +426,11 @@ namespace SwiftFind
                 StartIndexing();
                 e.Handled = true;
             }
+            else if (e.Control && e.KeyCode == Keys.D)
+            {
+                AddFavorite();
+                e.Handled = true;
+            }
         }
 
         void ResultsView_ItemDrag(object sender, ItemDragEventArgs e)
@@ -404,6 +439,18 @@ namespace SwiftFind
             if (paths.Count == 0) return;
             var data = new DataObject(DataFormats.FileDrop, paths.ToArray());
             resultsView.DoDragDrop(data, DragDropEffects.Copy | DragDropEffects.Move);
+        }
+
+        void ResultsView_ColumnClick(object sender, ColumnClickEventArgs e)
+        {
+            if (e.Column == sortColumn)
+                sortAsc = !sortAsc;
+            else
+            {
+                sortColumn = e.Column;
+                sortAsc = true;
+            }
+            ApplySearch();
         }
 
         // ---------- Indexing ----------
@@ -420,6 +467,7 @@ namespace SwiftFind
                     pathBox.Text = rootPath;
                     index.Clear();
                     resultsView.Items.Clear();
+                    SaveSettings();
                     UpdateStatus("Folder selected — click Build index");
                 }
             }
@@ -439,7 +487,6 @@ namespace SwiftFind
             btnIndex.Enabled = false;
             btnChoose.Enabled = false;
             progressBar.Visible = true;
-            progressBar.Value = 0;
             progressBar.Style = ProgressBarStyle.Marquee;
             UpdateStatus("Indexing...");
             indexer.RunWorkerAsync(rootPath);
@@ -448,73 +495,45 @@ namespace SwiftFind
         void Indexer_DoWork(object sender, DoWorkEventArgs e)
         {
             string root = (string)e.Argument;
-            var found = new List<FileEntry>();
-            var stack = new Stack<string>();
-            stack.Push(root);
-            int count = 0;
+            List<FileEntry> found = null;
+            string method = "recursive";
 
-            while (stack.Count > 0)
+            // Try fast USN path first on NTFS
+            if (UsnIndexer.IsSupported(root))
             {
-                if (indexer.CancellationPending) { e.Cancel = true; return; }
-
-                string dir = stack.Pop();
                 try
                 {
-                    // Files
-                    foreach (string file in Directory.GetFiles(dir))
+                    found = UsnIndexer.TryIndex(root, count =>
                     {
-                        try
-                        {
-                            var fi = new FileInfo(file);
-                            found.Add(new FileEntry
-                            {
-                                Name = fi.Name,
-                                FullPath = fi.FullName,
-                                Directory = fi.DirectoryName,
-                                Size = fi.Length,
-                                Modified = fi.LastWriteTime,
-                                IsDirectory = false
-                            });
-                            count++;
-                            if (count % 2500 == 0)
-                                indexer.ReportProgress(0, count);
-                        }
-                        catch { }
-                    }
-
-                    // Directories
-                    foreach (string sub in Directory.GetDirectories(dir))
-                    {
-                        try
-                        {
-                            var di = new DirectoryInfo(sub);
-                            if ((di.Attributes & FileAttributes.ReparsePoint) != 0) continue;
-
-                            found.Add(new FileEntry
-                            {
-                                Name = di.Name,
-                                FullPath = di.FullName,
-                                Directory = di.Parent != null ? di.Parent.FullName : "",
-                                Size = 0,
-                                Modified = di.LastWriteTime,
-                                IsDirectory = true
-                            });
-
-                            stack.Push(sub);
-                        }
-                        catch { }
-                    }
+                        if (indexer.CancellationPending) return;
+                        indexer.ReportProgress(0, "USN " + count.ToString("N0"));
+                    });
+                    if (found != null && found.Count > 0)
+                        method = "USN";
                 }
-                catch { }
+                catch { found = null; }
             }
 
-            e.Result = found;
+            // Fallback or primary recursive
+            if (found == null)
+            {
+                found = RecursiveIndexer.Index(root, count =>
+                {
+                    if (indexer.CancellationPending) return;
+                    indexer.ReportProgress(0, count.ToString("N0"));
+                });
+                method = "recursive";
+            }
+
+            // For USN results, sizes/dates are often missing — enrich a sample if needed
+            // (full enrichment would be slow; we keep name-first speed)
+
+            e.Result = new object[] { found, method };
         }
 
         void Indexer_ProgressChanged(object sender, ProgressChangedEventArgs e)
         {
-            int count = (int)e.UserState;
-            statusLabel.Text = "Indexing... " + count.ToString("N0") + " items";
+            statusLabel.Text = "Indexing... " + (e.UserState as string ?? "");
         }
 
         void Indexer_Completed(object sender, RunWorkerCompletedEventArgs e)
@@ -523,7 +542,6 @@ namespace SwiftFind
             btnIndex.Enabled = true;
             btnChoose.Enabled = true;
             progressBar.Visible = false;
-            progressBar.Style = ProgressBarStyle.Continuous;
 
             if (e.Cancelled)
             {
@@ -536,97 +554,108 @@ namespace SwiftFind
                 return;
             }
 
-            index = (List<FileEntry>)e.Result;
+            var result = (object[])e.Result;
+            index = (List<FileEntry>)result[0];
+            lastIndexMethod = (string)result[1];
+            lastIndexTime = DateTime.Now;
+
             SaveCache();
+            SaveSettings();
             ApplySearch();
             UpdateStatus();
             queryBox.Focus();
         }
 
-        // ---------- Search & Filters ----------
+        // ---------- Search ----------
 
         void ApplySearch()
         {
-            string q = queryBox.Text.Trim();
-            string[] terms = q.Length == 0
-                ? new string[0]
-                : q.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            string text = queryBox.Text.Trim();
 
+            // Remember recent queries
+            if (text.Length > 1 && !recentQueries.Contains(text))
+            {
+                recentQueries.Insert(0, text);
+                if (recentQueries.Count > 20) recentQueries.RemoveAt(20);
+            }
+
+            var q = SearchEngine.Parse(text);
+
+            // Apply UI filters on top of query syntax
             string extFilter = filterExt.SelectedItem as string ?? "Any type";
+            if (extFilter != "Any type" && string.IsNullOrEmpty(q.Extension))
+                q.Extension = extFilter.ToLowerInvariant();
+
             string sizeFilter = filterSize.SelectedItem as string ?? "Any size";
-            string dateFilter = filterDate.SelectedItem as string ?? "Any date";
-
-            IEnumerable<FileEntry> query = index;
-
-            // Text terms (AND)
-            if (terms.Length > 0)
-            {
-                query = query.Where(f =>
-                {
-                    foreach (string t in terms)
-                    {
-                        if (f.Name.IndexOf(t, StringComparison.OrdinalIgnoreCase) < 0 &&
-                            f.FullPath.IndexOf(t, StringComparison.OrdinalIgnoreCase) < 0)
-                            return false;
-                    }
-                    return true;
-                });
-            }
-
-            // Extension filter
-            if (extFilter != "Any type")
-            {
-                string ext = extFilter.ToLowerInvariant();
-                query = query.Where(f => !f.IsDirectory && f.Extension == ext);
-            }
-
-            // Size filter
             if (sizeFilter != "Any size")
             {
-                query = query.Where(f =>
+                switch (sizeFilter)
                 {
-                    if (f.IsDirectory) return false;
-                    switch (sizeFilter)
-                    {
-                        case "Empty": return f.Size == 0;
-                        case "< 1 KB": return f.Size < 1024;
-                        case "< 100 KB": return f.Size < 100 * 1024;
-                        case "< 1 MB": return f.Size < 1024 * 1024;
-                        case "< 10 MB": return f.Size < 10 * 1024 * 1024;
-                        case "< 100 MB": return f.Size < 100L * 1024 * 1024;
-                        case "> 100 MB": return f.Size >= 100L * 1024 * 1024;
-                    }
-                    return true;
-                });
+                    case "Empty": q.MaxSize = 0; break;
+                    case "< 1 KB": q.MaxSize = 1024; break;
+                    case "< 100 KB": q.MaxSize = 100 * 1024; break;
+                    case "< 1 MB": q.MaxSize = 1024 * 1024; break;
+                    case "< 10 MB": q.MaxSize = 10 * 1024 * 1024; break;
+                    case "< 100 MB": q.MaxSize = 100L * 1024 * 1024; break;
+                    case "> 100 MB": q.MinSize = 100L * 1024 * 1024; break;
+                }
             }
 
-            // Date filter
-            if (dateFilter != "Any date")
+            string dateFilter = filterDate.SelectedItem as string ?? "Any date";
+            if (dateFilter != "Any date" && !q.ModifiedAfter.HasValue)
             {
                 DateTime now = DateTime.Now.Date;
-                query = query.Where(f =>
+                switch (dateFilter)
                 {
-                    DateTime m = f.Modified.Date;
-                    switch (dateFilter)
-                    {
-                        case "Today": return m == now;
-                        case "Yesterday": return m == now.AddDays(-1);
-                        case "Last 7 days": return m >= now.AddDays(-7);
-                        case "Last 30 days": return m >= now.AddDays(-30);
-                        case "This year": return m.Year == now.Year;
-                    }
-                    return true;
-                });
+                    case "Today": q.ModifiedAfter = now; break;
+                    case "Yesterday": q.ModifiedAfter = now.AddDays(-1); q.ModifiedBefore = now; break;
+                    case "Last 7 days": q.ModifiedAfter = now.AddDays(-7); break;
+                    case "Last 30 days": q.ModifiedAfter = now.AddDays(-30); break;
+                    case "This year": q.ModifiedAfter = new DateTime(now.Year, 1, 1); break;
+                }
             }
 
-            visible = query
-                .OrderBy(f => f.IsDirectory ? 0 : 1)
-                .ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
-                .Take(8000)
-                .ToList();
+            visible = SearchEngine.Execute(index, q, 10000);
+
+            // Column sort
+            visible = SortVisible(visible);
 
             PopulateList();
             UpdateStatus();
+        }
+
+        List<FileEntry> SortVisible(List<FileEntry> list)
+        {
+            IOrderedEnumerable<FileEntry> ordered;
+            switch (sortColumn)
+            {
+                case 1: // Location
+                    ordered = sortAsc
+                        ? list.OrderBy(f => f.Directory, StringComparer.OrdinalIgnoreCase)
+                        : list.OrderByDescending(f => f.Directory, StringComparer.OrdinalIgnoreCase);
+                    break;
+                case 2: // Size
+                    ordered = sortAsc
+                        ? list.OrderBy(f => f.Size)
+                        : list.OrderByDescending(f => f.Size);
+                    break;
+                case 3: // Modified
+                    ordered = sortAsc
+                        ? list.OrderBy(f => f.Modified)
+                        : list.OrderByDescending(f => f.Modified);
+                    break;
+                case 4: // Type
+                    ordered = sortAsc
+                        ? list.OrderBy(f => f.IsDirectory ? "" : f.Extension)
+                        : list.OrderByDescending(f => f.IsDirectory ? "" : f.Extension);
+                    break;
+                default: // Name
+                    ordered = sortAsc
+                        ? list.OrderBy(f => f.IsDirectory ? 0 : 1).ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
+                        : list.OrderBy(f => f.IsDirectory ? 0 : 1).ThenByDescending(f => f.Name, StringComparer.OrdinalIgnoreCase);
+                    break;
+            }
+            return ordered.ToList();
         }
 
         void PopulateList()
@@ -636,13 +665,15 @@ namespace SwiftFind
 
             foreach (var f in visible)
             {
-                var item = new ListViewItem(f.IsDirectory ? "📁 " + f.Name : f.Name);
+                bool isFav = favorites.Contains(f.FullPath);
+                string prefix = f.IsDirectory ? "📁 " : (isFav ? "★ " : "");
+                var item = new ListViewItem(prefix + f.Name);
                 item.SubItems.Add(f.Directory ?? "");
                 item.SubItems.Add(f.IsDirectory ? "" : FormatSize(f.Size));
-                item.SubItems.Add(f.Modified.ToString("yyyy-MM-dd HH:mm"));
+                item.SubItems.Add(f.Modified == DateTime.MinValue ? "" : f.Modified.ToString("yyyy-MM-dd HH:mm"));
                 item.SubItems.Add(f.IsDirectory ? "Folder" : (f.Extension.Length > 0 ? f.Extension : "file"));
                 item.Tag = f;
-                item.ForeColor = f.IsDirectory ? Color.FromArgb(140, 190, 255) : Color.White;
+                item.ForeColor = f.IsDirectory ? Color.FromArgb(140, 190, 255) : (isFav ? FavColor : Color.White);
                 resultsView.Items.Add(item);
             }
 
@@ -706,15 +737,13 @@ namespace SwiftFind
             clipboardPaths = paths;
             clipboardIsCut = cut;
 
-            // Also put on Windows clipboard for Explorer interop
             try
             {
                 var data = new DataObject();
                 data.SetData(DataFormats.FileDrop, paths.ToArray());
-                // Preferred DropEffect for cut
                 if (cut)
                 {
-                    byte[] effect = new byte[] { 2, 0, 0, 0 }; // Move
+                    byte[] effect = new byte[] { 2, 0, 0, 0 };
                     data.SetData("Preferred DropEffect", new MemoryStream(effect));
                 }
                 Clipboard.SetDataObject(data, true);
@@ -726,7 +755,6 @@ namespace SwiftFind
 
         void ClipboardPaste()
         {
-            // Prefer internal clipboard, fall back to Windows clipboard
             List<string> sources = clipboardPaths;
             bool isCut = clipboardIsCut;
 
@@ -740,7 +768,6 @@ namespace SwiftFind
 
             if (sources.Count == 0) return;
 
-            // Destination: directory of first selected item, or root
             string destDir = rootPath;
             var selected = GetSelectedEntries();
             if (selected.Count > 0)
@@ -763,7 +790,6 @@ namespace SwiftFind
                     string name = Path.GetFileName(src);
                     string dest = Path.Combine(destDir, name);
 
-                    // Avoid overwrite without asking
                     if (File.Exists(dest) || Directory.Exists(dest))
                     {
                         string baseName = Path.GetFileNameWithoutExtension(name);
@@ -795,8 +821,7 @@ namespace SwiftFind
             }
 
             if (isCut) clipboardPaths.Clear();
-            UpdateStatus("Pasted " + ok + " item(s)");
-            // Note: index is stale after paste — user can rebuild
+            UpdateStatus("Pasted " + ok + " item(s) — rebuild index to see them");
         }
 
         void CopyDirectory(string src, string dest)
@@ -831,7 +856,6 @@ namespace SwiftFind
                 else
                     File.Move(entry.FullPath, dest);
 
-                // Update in-memory index
                 entry.Name = newName;
                 entry.FullPath = dest;
                 ApplySearch();
@@ -866,6 +890,7 @@ namespace SwiftFind
                         File.Delete(e.FullPath);
 
                     index.RemoveAll(x => x.FullPath == e.FullPath);
+                    favorites.Remove(e.FullPath);
                     ok++;
                 }
                 catch (Exception ex)
@@ -874,6 +899,7 @@ namespace SwiftFind
                 }
             }
 
+            SaveFavorites();
             ApplySearch();
             UpdateStatus("Deleted " + ok + " item(s)");
         }
@@ -931,14 +957,11 @@ namespace SwiftFind
             var e = entries[0];
             try
             {
-                // Shell properties dialog
-                Process.Start("explorer.exe", "/select,\"" + e.FullPath + "\"");
-                // Also show a quick summary
                 string info = e.Name + "\n\n" +
                     "Path: " + e.FullPath + "\n" +
                     "Type: " + (e.IsDirectory ? "Folder" : e.Extension) + "\n" +
                     "Size: " + (e.IsDirectory ? "—" : FormatSize(e.Size)) + "\n" +
-                    "Modified: " + e.Modified.ToString("yyyy-MM-dd HH:mm:ss");
+                    "Modified: " + (e.Modified == DateTime.MinValue ? "—" : e.Modified.ToString("yyyy-MM-dd HH:mm:ss"));
                 MessageBox.Show(info, "Properties — " + e.Name);
             }
             catch (Exception ex)
@@ -947,7 +970,42 @@ namespace SwiftFind
             }
         }
 
-        // ---------- Cache ----------
+        // ---------- Favorites ----------
+
+        void AddFavorite()
+        {
+            var entries = GetSelectedEntries();
+            if (entries.Count == 0) return;
+
+            int added = 0;
+            foreach (var e in entries)
+            {
+                if (!favorites.Contains(e.FullPath))
+                {
+                    favorites.Add(e.FullPath);
+                    added++;
+                }
+            }
+            SaveFavorites();
+            ApplySearch();
+            UpdateStatus("Added " + added + " to favorites");
+        }
+
+        void ShowFavorites()
+        {
+            if (favorites.Count == 0)
+            {
+                MessageBox.Show("No favorites yet.\nSelect items and press Ctrl+D or use the context menu.", "Favorites");
+                return;
+            }
+
+            queryBox.Text = "";
+            visible = index.Where(f => favorites.Contains(f.FullPath)).ToList();
+            PopulateList();
+            UpdateStatus("Showing " + visible.Count + " favorites");
+        }
+
+        // ---------- Persistence ----------
 
         void SaveCache()
         {
@@ -958,9 +1016,10 @@ namespace SwiftFind
                 {
                     w.WriteLine(rootPath);
                     w.WriteLine(index.Count);
+                    w.WriteLine(lastIndexMethod);
+                    w.WriteLine(lastIndexTime.Ticks);
                     foreach (var f in index)
                     {
-                        // path|size|ticks|isDir
                         w.WriteLine(
                             Convert.ToBase64String(Encoding.UTF8.GetBytes(f.FullPath)) + "|" +
                             f.Size + "|" +
@@ -988,6 +1047,11 @@ namespace SwiftFind
                     int expected;
                     if (!int.TryParse(countLine, out expected)) return;
 
+                    lastIndexMethod = r.ReadLine() ?? "recursive";
+                    long ticks;
+                    if (long.TryParse(r.ReadLine(), out ticks))
+                        lastIndexTime = new DateTime(ticks);
+
                     var loaded = new List<FileEntry>();
                     string line;
                     while ((line = r.ReadLine()) != null)
@@ -995,9 +1059,9 @@ namespace SwiftFind
                         string[] parts = line.Split('|');
                         if (parts.Length != 4) continue;
 
-                        long size, ticks;
+                        long size, t;
                         if (!long.TryParse(parts[1], out size)) continue;
-                        if (!long.TryParse(parts[2], out ticks)) continue;
+                        if (!long.TryParse(parts[2], out t)) continue;
 
                         string path = Encoding.UTF8.GetString(Convert.FromBase64String(parts[0]));
                         bool isDir = parts[3] == "1";
@@ -1008,7 +1072,7 @@ namespace SwiftFind
                             FullPath = path,
                             Directory = Path.GetDirectoryName(path),
                             Size = size,
-                            Modified = new DateTime(ticks),
+                            Modified = new DateTime(t),
                             IsDirectory = isDir
                         });
                     }
@@ -1021,6 +1085,45 @@ namespace SwiftFind
             }
         }
 
+        void SaveFavorites()
+        {
+            try { File.WriteAllLines(favPath, favorites); }
+            catch { }
+        }
+
+        void LoadFavorites()
+        {
+            try
+            {
+                if (File.Exists(favPath))
+                    favorites = new List<string>(File.ReadAllLines(favPath));
+            }
+            catch { }
+        }
+
+        void SaveSettings()
+        {
+            try
+            {
+                File.WriteAllText(settingsPath, rootPath + Environment.NewLine + lastIndexMethod);
+            }
+            catch { }
+        }
+
+        void LoadSettings()
+        {
+            try
+            {
+                if (File.Exists(settingsPath))
+                {
+                    var lines = File.ReadAllLines(settingsPath);
+                    if (lines.Length > 0 && Directory.Exists(lines[0]))
+                        rootPath = lines[0];
+                }
+            }
+            catch { }
+        }
+
         // ---------- Helpers ----------
 
         void UpdateStatus(string extra = null)
@@ -1030,9 +1133,12 @@ namespace SwiftFind
                 statusLabel.Text = extra;
                 return;
             }
+
+            string method = lastIndexMethod == "USN" ? "USN fast" : lastIndexMethod;
+            string when = lastIndexTime == DateTime.MinValue ? "" : "  ·  indexed " + lastIndexTime.ToString("HH:mm");
             statusLabel.Text = string.Format(
-                "{0:N0} indexed  ·  showing {1:N0}  ·  {2}",
-                index.Count, visible.Count, rootPath);
+                "{0:N0} indexed ({1})  ·  showing {2:N0}{3}  ·  {4}",
+                index.Count, method, visible.Count, when, rootPath);
         }
 
         static string FormatSize(long bytes)
@@ -1090,17 +1196,6 @@ namespace SwiftFind
 
                 return form.ShowDialog() == DialogResult.OK ? tb.Text.Trim() : null;
             }
-        }
-    }
-
-    static class Program
-    {
-        [STAThread]
-        static void Main()
-        {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm());
         }
     }
 }

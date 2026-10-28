@@ -1,130 +1,144 @@
 # SwiftFind
 
-**Instant desktop search + lightweight file manager for Windows**
+**Instant desktop search + Explorer-like file manager for Windows**
 
-SwiftFind finds files and folders the moment you type — then lets you act on them like Explorer: open, rename, delete, copy, cut, paste, new folder, drag-out, and more.
+Find anything in milliseconds, then act on it without leaving the app: open, rename, delete, copy, cut, paste, new folder, drag-out, favorites.
 
-Built to feel modern, stay fast, and run on everything from **Windows 8 / 8.1** through **Windows 11**.
-
----
-
-## Why SwiftFind?
-
-Most search tools stop at “find it”.  
-SwiftFind continues: **find it → work with it**.
-
-| Feature | SwiftFind | Typical search tools |
-|---------|-----------|----------------------|
-| Instant name + path search | Yes | Yes |
-| Multi-select | Yes | Rare |
-| Full Explorer-style context menu | Yes | Limited |
-| Rename / Delete / New folder | Yes | No |
-| Copy / Cut / Paste (with Explorer interop) | Yes | No |
-| Drag files out to Explorer or other apps | Yes | Rare |
-| Size / Date / Extension filters | Yes | Partial |
-| Persistent local index | Yes | Yes |
-| Works on Windows 8 → 11 | Yes | Varies |
-| Zero installer needed (single EXE) | Yes | Varies |
-| Dark modern UI | Yes | Mixed |
-
-### Unique advantages
-- **Search + manage in one place** — no need to jump back to Explorer for everyday actions.
-- **Keyboard-first** — Ctrl+C / X / V, F2, Delete, Enter, Ctrl+A, Ctrl+F, Ctrl+R all work as expected.
-- **Clean, distraction-free dark interface** designed for long sessions.
-- **Lightweight** — pure .NET Framework WinForms, no Electron, no heavy runtime.
+Runs on **Windows 8 / 8.1 → Windows 11**. Optional **USN Journal fast path** on NTFS for near-Everything speed.
 
 ---
 
-## Screenshots (conceptual)
+## Why SwiftFind beats the others
 
-- Large search bar at the top — results appear as you type.
-- Filters for type, size and date sit just below the path bar.
-- Results list shows Name · Location · Size · Modified · Type.
-- Right-click any selection for the full action menu.
-- Status bar always shows indexed count and current folder.
+| Capability | SwiftFind | Everything | Listary | Agent Ransack |
+|------------|-----------|------------|---------|---------------|
+| Instant name/path search | Yes | Excellent | Good | Good |
+| Full file management (rename/delete/copy/cut/paste/new folder) | **Yes** | Limited | Limited | No |
+| Multi-select + drag-out to Explorer | **Yes** | Limited | Partial | No |
+| Favorites / bookmarks | **Yes** | No | Partial | No |
+| Advanced query syntax (`ext:`, `size:>`, `dm:`, wildcards, regex) | **Yes** | Yes | Partial | Yes |
+| USN / MFT fast indexing | **Yes** (with recursive fallback) | Yes | No | No |
+| Column sorting | **Yes** | Yes | Limited | Yes |
+| Portable mode | **Yes** | Yes | No | Yes |
+| Windows 8 → 11 | **Yes** | Yes | Yes | Yes |
+| Dark modern UI | **Yes** | Basic | Good | Basic |
+| Zero heavy runtime | **Yes** (.NET Framework) | Yes | Yes | Yes |
+
+**Gap we close:** most search tools stop at “find it”. SwiftFind continues — **find it → work with it** — with a full Explorer-style action surface inside the same window.
+
+---
+
+## Features
+
+### Search
+- Instant as-you-type results
+- Name + full path matching
+- Wildcards (`*report*`, `file?.txt`)
+- Operators: `ext:pdf`, `size:>10MB`, `size:<1KB`, `dm:today`, `dm:week`, `dm:month`, `dm:year`, `regex:`
+- UI filters for type / size / modified date
+- Click any column header to sort
+
+### File management (the differentiator)
+- Open / Open containing folder
+- Rename (F2)
+- Delete (with confirmation)
+- Copy / Cut / Paste (interop with Explorer clipboard)
+- New folder
+- Drag selected items out to Explorer or other apps
+- Multi-select + Select All
+- Copy full path(s)
+- Properties summary
+
+### Other
+- Favorites (★ / Ctrl+D)
+- Persistent index cache
+- USN Journal fast path on NTFS (falls back to recursive walk automatically)
+- Portable mode (create empty `SwiftFind.portable` next to the EXE)
+- Clean dark UI, keyboard-first workflow
+
+---
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+F` | Focus search |
+| `Ctrl+R` | Rebuild index |
+| `Ctrl+D` | Add to Favorites |
+| `Enter` | Open |
+| `F2` | Rename |
+| `Delete` | Delete |
+| `Ctrl+C / X / V` | Copy / Cut / Paste |
+| `Ctrl+A` | Select all visible |
+| `Esc` | Clear search |
+| `↓` from search box | Jump to results |
 
 ---
 
 ## Quick start
 
-### Option A – Run the pre-built EXE
-1. Download `SwiftFind.exe` from the repository.
-2. Double-click. No installation required.
-3. Click **Choose folder**, select a drive or directory, then **Build index**.
-4. Start typing. Results appear instantly.
+### Build with Visual Studio / modern tooling
+```bash
+cd src/SwiftFind.App
+dotnet build -c Release
+```
+(or open `SwiftFind.csproj` in Visual Studio)
 
-### Option B – Build from source
-Requirements: Windows + .NET Framework 4.5 or later (included in Windows 8+).
-
+### Classic build script
 ```powershell
-# From the repository root
 .\scripts\Build.ps1
 ```
 
-Or compile manually:
-
-```powershell
-csc /target:winexe /out:SwiftFind.exe /r:System.Windows.Forms.dll /r:System.Drawing.dll src\SwiftFind.App\SwiftFind.cs
+### Run
 ```
+SwiftFind.exe
+```
+1. Choose a folder or drive
+2. Click **Build index** (USN is tried first on NTFS)
+3. Type to search — results appear instantly
+4. Right-click or use shortcuts to manage files
 
 ---
 
-## Everyday workflow
+## Advanced query examples
 
-1. **Index** once (or refresh when needed).
-2. **Type** any part of the name or path — results update live.
-3. **Filter** by extension, size or date if the list is large.
-4. **Act**:
-   - Double-click or Enter → open
-   - F2 → rename
-   - Delete → remove (with confirmation)
-   - Ctrl+C / Ctrl+X → copy or cut
-   - Ctrl+V → paste into the current/selected folder
-   - Right-click → full menu (open location, new folder, properties, copy path…)
-   - Drag selected items out to Explorer or other applications
-
-Keyboard shortcuts:
-
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+F` | Focus search box |
-| `Ctrl+R` | Rebuild index |
-| `Enter` | Open selected |
-| `F2` | Rename |
-| `Delete` | Delete |
-| `Ctrl+C` | Copy |
-| `Ctrl+X` | Cut |
-| `Ctrl+V` | Paste |
-| `Ctrl+A` | Select all visible |
-| `Esc` | Clear search |
+```
+report                          # name or path contains "report"
+*2024*.pdf                      # wildcards
+ext:pdf size:>5MB               # PDFs larger than 5 MB
+dm:week invoice                 # modified in last 7 days + "invoice"
+regex:^Draft.*\.docx$           # regular expression
+```
 
 ---
 
 ## Technical notes
 
-- **Indexing**: recursive walk of the chosen root (skips reparse points / junctions). Progress is reported live. Index is cached under `%LocalAppData%\SwiftFind`.
-- **Search**: case-insensitive AND matching across file name and full path. Results capped at 8 000 for responsiveness.
-- **Compatibility**: targets .NET Framework 4.5+. Uses only APIs available since Windows 8. No Windows 10/11-only features required.
-- **Permissions**: runs with the rights of the current user. Protected system folders may be skipped during indexing (normal behaviour).
+- **Target**: .NET Framework 4.8 (works on Windows 8+ with Framework installed; 4.5+ APIs only)
+- **Indexing**: USN Journal (`FSCTL_ENUM_USN_DATA`) when available and permitted → otherwise recursive walk that skips reparse points
+- **Cache**: `%LocalAppData%\SwiftFind` (or next to EXE in portable mode)
+- **Permissions**: runs as the current user. System volumes may need elevation for full USN access; the app falls back gracefully.
 
 ---
 
-## Roadmap ideas
+## Project structure
 
-- Optional USN Journal / MFT fast path for near-Everything speed on NTFS
-- Content search (text inside files)
-- Bookmarks / favorites
-- Portable mode (settings next to the EXE)
-- Light theme toggle
-
-Contributions and ideas welcome.
+```
+src/SwiftFind.App/
+  SwiftFind.csproj
+  Program.cs
+  SwiftFind.cs              ← MainForm (UI + orchestration)
+  Models/FileEntry.cs
+  Indexing/
+    UsnIndexer.cs           ← Fast NTFS path
+    RecursiveIndexer.cs     ← Reliable fallback
+  Search/SearchEngine.cs    ← Query parser + execution
+```
 
 ---
 
 ## License
 
 MIT — free for personal and commercial use.
-
----
 
 **SwiftFind** — find anything, then do something with it.
