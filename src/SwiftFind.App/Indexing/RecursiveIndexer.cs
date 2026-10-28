@@ -14,6 +14,7 @@ namespace SwiftFind.Indexing
             HashSet<string> excludeExtensions = null)
         {
             var found = new List<FileEntry>(128000);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var stack = new Stack<string>();
             stack.Push(rootPath);
             int count = 0;
@@ -22,11 +23,7 @@ namespace SwiftFind.Indexing
             {
                 string dir = stack.Pop();
 
-                if (excludeFolders != null && excludeFolders.Contains(dir))
-                    continue;
-
-                // Also skip if any parent is excluded (simple prefix check)
-                if (excludeFolders != null && IsUnderExcluded(dir, excludeFolders))
+                if (excludeFolders != null && (excludeFolders.Contains(dir) || IsUnderExcluded(dir, excludeFolders)))
                     continue;
 
                 try
@@ -37,6 +34,10 @@ namespace SwiftFind.Indexing
                         {
                             string ext = Path.GetExtension(file).ToLowerInvariant();
                             if (excludeExtensions != null && excludeExtensions.Contains(ext))
+                                continue;
+
+                            // Hard deduplication
+                            if (!seen.Add(file))
                                 continue;
 
                             var fi = new FileInfo(file);
@@ -53,7 +54,7 @@ namespace SwiftFind.Indexing
                             if (progress != null && count % 2500 == 0)
                                 progress(count);
                         }
-                        catch { /* skip locked / permission files */ }
+                        catch { }
                     }
 
                     foreach (string sub in Directory.GetDirectories(dir))
@@ -66,6 +67,9 @@ namespace SwiftFind.Indexing
 
                             if (excludeFolders != null &&
                                 (excludeFolders.Contains(sub) || IsUnderExcluded(sub, excludeFolders)))
+                                continue;
+
+                            if (!seen.Add(sub))
                                 continue;
 
                             found.Add(new FileEntry
@@ -83,7 +87,7 @@ namespace SwiftFind.Indexing
                         catch { }
                     }
                 }
-                catch { /* skip inaccessible directories */ }
+                catch { }
             }
 
             return found;
