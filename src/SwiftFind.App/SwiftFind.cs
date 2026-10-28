@@ -137,7 +137,7 @@ namespace SwiftFind
 
             // File
             var mFile = new ToolStripMenuItem("&File");
-            mFile.DropDownItems.Add("&Choose folder…", null, (s, e) => ChooseFolder());
+            mFile.DropDownItems.Add("&Choose folderâ€¦", null, (s, e) => ChooseFolder());
             mFile.DropDownItems.Add("&Build / Refresh index\tCtrl+R", null, (s, e) => StartIndexing());
             mFile.DropDownItems.Add(new ToolStripSeparator());
             mFile.DropDownItems.Add("E&xit", null, (s, e) => Close());
@@ -192,7 +192,7 @@ namespace SwiftFind
 
             // Tools
             var mTools = new ToolStripMenuItem("&Tools");
-            mTools.DropDownItems.Add("&Preferences…\tCtrl+,\", null, (s, e) => OpenPreferences());
+            mTools.DropDownItems.Add("&Preferences...\tCtrl+,", null, (s, e) => OpenPreferences());
             mTools.DropDownItems.Add("Show &Favorites\tCtrl+D", null, (s, e) => ShowFavorites());
             mTools.DropDownItems.Add(new ToolStripSeparator());
             mTools.DropDownItems.Add("Clear search", null, (s, e) => { queryBox.Clear(); queryBox.Focus(); });
@@ -205,7 +205,7 @@ namespace SwiftFind
             mHelp.DropDownItems.Add("About SwiftFind", null, (s, e) =>
             {
                 MessageBox.Show(
-                    "SwiftFind 2.5\n\nInstant search + Explorer-like file manager\nWindows 8 – 11\n\nBuilt with care for speed, clarity and control.",
+                    "SwiftFind 2.5\n\nInstant search + Explorer-like file manager\nWindows 8 â€“ 11\n\nBuilt with care for speed, clarity and control.",
                     "About SwiftFind",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
             });
@@ -301,7 +301,7 @@ namespace SwiftFind
             btnChoose = MakeButton("Choose folder", Accent);
             btnIndex = MakeButton("Build index", AccentGreen);
             btnClear = MakeButton("Clear", Surface2);
-            btnFav = MakeButton("★ Fav", Surface2);
+            btnFav = MakeButton("â˜… Fav", Surface2);
 
             pathPanel.Controls.Add(pathBox, 0, 0);
             pathPanel.Controls.Add(btnChoose, 1, 0);
@@ -560,7 +560,7 @@ namespace SwiftFind
                         settings.Save();
                         index.Clear();
                         resultsView.Items.Clear();
-                        UpdateStatus("Folder selected — click Build index");
+                        UpdateStatus("Folder selected â€” click Build index");
                     }
                 }
             }
@@ -582,7 +582,7 @@ namespace SwiftFind
             btnChoose.Enabled = false;
             progressBar.Visible = true;
             progressBar.Style = ProgressBarStyle.Marquee;
-            UpdateStatus("Indexing…");
+            UpdateStatus("Indexingâ€¦");
             indexer.RunWorkerAsync(settings.RootPath);
         }
 
@@ -633,7 +633,7 @@ namespace SwiftFind
 
         void Indexer_ProgressChanged(object sender, ProgressChangedEventArgs e)
         {
-            try { statusLabel.Text = "Indexing… " + (e.UserState as string ?? ""); }
+            try { statusLabel.Text = "Indexingâ€¦ " + (e.UserState as string ?? ""); }
             catch { }
         }
 
@@ -784,7 +784,7 @@ namespace SwiftFind
             foreach (var f in visible)
             {
                 bool isFav = favorites.Contains(f.FullPath);
-                string prefix = f.IsDirectory ? "📁 " : (isFav ? "★ " : "");
+                string prefix = f.IsDirectory ? "ðŸ“ " : (isFav ? "â˜… " : "");
                 var item = new ListViewItem(prefix + f.Name);
                 item.SubItems.Add(f.Directory ?? "");
                 item.SubItems.Add(f.IsDirectory ? "" : FormatSize(f.Size));
@@ -838,10 +838,10 @@ namespace SwiftFind
                     if (f.IsDirectory) return "Folders";
                     if (f.Size == 0) return "Empty";
                     if (f.Size < 1024) return "< 1 KB";
-                    if (f.Size < 100 * 1024) return "1 KB – 100 KB";
-                    if (f.Size < 1024 * 1024) return "100 KB – 1 MB";
-                    if (f.Size < 10 * 1024 * 1024) return "1 MB – 10 MB";
-                    if (f.Size < 100L * 1024 * 1024) return "10 MB – 100 MB";
+                    if (f.Size < 100 * 1024) return "1 KB â€“ 100 KB";
+                    if (f.Size < 1024 * 1024) return "100 KB â€“ 1 MB";
+                    if (f.Size < 10 * 1024 * 1024) return "1 MB â€“ 10 MB";
+                    if (f.Size < 100L * 1024 * 1024) return "10 MB â€“ 100 MB";
                     return "> 100 MB";
                 default:
                     return "All";
@@ -970,7 +970,7 @@ namespace SwiftFind
                 catch (Exception ex) { MessageBox.Show("Failed: " + ex.Message, "SwiftFind"); }
             }
             if (isCut) clipboardPaths.Clear();
-            UpdateStatus("Pasted " + ok + " item(s) — rebuild index to refresh");
+            UpdateStatus("Pasted " + ok + " item(s) â€” rebuild index to refresh");
         }
 
         void CopyDirectory(string src, string dest)
@@ -1070,9 +1070,9 @@ namespace SwiftFind
             var e = entries[0];
             string info = e.Name + "\n\nPath: " + e.FullPath +
                 "\nType: " + (e.IsDirectory ? "Folder" : e.Extension) +
-                "\nSize: " + (e.IsDirectory ? "—" : FormatSize(e.Size)) +
-                "\nModified: " + (e.Modified == DateTime.MinValue ? "—" : e.Modified.ToString("yyyy-MM-dd HH:mm:ss"));
-            MessageBox.Show(info, "Properties — " + e.Name);
+                "\nSize: " + (e.IsDirectory ? "â€”" : FormatSize(e.Size)) +
+                "\nModified: " + (e.Modified == DateTime.MinValue ? "â€”" : e.Modified.ToString("yyyy-MM-dd HH:mm:ss"));
+            MessageBox.Show(info, "Properties â€” " + e.Name);
         }
 
         // ---------- Favorites & Preferences ----------
@@ -1128,7 +1128,7 @@ namespace SwiftFind
                 "Ctrl+C / X / V  Copy / Cut / Paste\n" +
                 "Ctrl+A          Select all\n" +
                 "Esc             Clear search\n" +
-                "↓ from search   Jump to results",
+                "â†“ from search   Jump to results",
                 "Keyboard Shortcuts",
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
@@ -1235,8 +1235,8 @@ namespace SwiftFind
                 if (extra != null) { statusLabel.Text = extra; return; }
                 string method = settings.LastIndexMethod == "USN" ? "USN fast" : settings.LastIndexMethod;
                 string when = settings.LastIndexTicks == 0 ? "" :
-                    "  ·  " + new DateTime(settings.LastIndexTicks).ToString("HH:mm");
-                statusLabel.Text = string.Format("{0:N0} indexed ({1})  ·  showing {2:N0}{3}  ·  {4}",
+                    "  Â·  " + new DateTime(settings.LastIndexTicks).ToString("HH:mm");
+                statusLabel.Text = string.Format("{0:N0} indexed ({1})  Â·  showing {2:N0}{3}  Â·  {4}",
                     index.Count, method, visible.Count, when, settings.RootPath);
             }
             catch { }
