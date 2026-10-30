@@ -13,13 +13,12 @@ namespace SwiftFind
             Application.SetCompatibleTextRenderingDefault(false);
 
             var form = new MainForm();
-
-            // Apply premium icon to the main window (title bar + taskbar)
             try
             {
-                form.Icon = AppIcon.Create();
+                var icon = AppIcon.TryLoad();
+                if (icon != null) form.Icon = icon;
             }
-            catch { /* keep default if icon generation fails */ }
+            catch { }
 
             Application.Run(form);
         }

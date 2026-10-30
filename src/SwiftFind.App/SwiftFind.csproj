@@ -13,10 +13,10 @@
     <AssemblyTitle>SwiftFind</AssemblyTitle>
     <Product>SwiftFind</Product>
     <Company>Bravo Company Cyber</Company>
-    <Description>Professional instant desktop search and Explorer-like file manager for Windows 8–11</Description>
-    <Copyright>Copyright © 2026</Copyright>
-    <Version>2.6.1</Version>
-    <FileVersion>2.6.1</FileVersion>
+    <Description>Professional instant desktop search and Explorer-like file manager for Windows 8-11</Description>
+    <Copyright>Copyright (c) 2026</Copyright>
+    <Version>2.7.0</Version>
+    <FileVersion>2.7.0</FileVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <OutputPath>$(MSBuildThisFileDirectory)..\..\</OutputPath>
     <ApplicationIcon Condition="Exists('..\..\assets\SwiftFind.ico')">..\..\assets\SwiftFind.ico</ApplicationIcon>
@@ -24,6 +24,10 @@
 
   <ItemGroup>
     <Compile Remove="NativeMftProbe.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('..\..\assets\SwiftFind.ico')">
+    <Content Include="..\..\assets\SwiftFind.ico" Link="SwiftFind.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

@@ -34,6 +34,10 @@ jobs:
         run: |
           if (-not (Test-Path assets)) { New-Item -ItemType Directory -Path assets | Out-Null }
 
+      - name: Build application icon
+        shell: pwsh
+        run: pwsh -File scripts/MakeIcon.ps1
+
       - name: Build (Release)
         working-directory: src/SwiftFind.App
         run: |
@@ -101,4 +105,4 @@ jobs:
           echo "- Artifact: **SwiftFind-windows-x64**" >> $GITHUB_STEP_SUMMARY
           echo "- Download from the Actions run or from Releases (when tagged)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "To publish a release: \`git tag v2.6.0 && git push origin v2.6.0\`" >> $GITHUB_STEP_SUMMARY
+          echo "To publish a release: \`git tag v2.7.0 && git push origin v2.7.0\`" >> $GITHUB_STEP_SUMMARY
