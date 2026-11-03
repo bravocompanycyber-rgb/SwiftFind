@@ -12,6 +12,10 @@ A ground-up quality pass: new design, new brand assets, many correctness fixes.
 - Window size, position, maximised state and sort order are remembered
 - Per-monitor high-DPI support (manifest + DPI-aware layout)
 
+### Everyday use
+- Global hotkey `Ctrl+Alt+Space` (falls back gracefully if another program already owns it) and optional close-to-tray with a tray menu
+- Starting SwiftFind again focuses the running instance instead of showing an error
+
 ### Search
 - Quoted phrases, exclusions (`!word` / `-word`), `path:`, `file:`, `folder:`, `case:`, `regex:pattern`, size ranges (`1mb..5mb`, `>=`, `<=`), date ranges and `dm:yesterday/month/year`
 - Search runs on a background thread and is cancelled when you keep typing — no more UI stalls on large indexes

@@ -17,6 +17,8 @@ SwiftFind builds an index of a folder or drive and then searches it as you type.
 - **Export results to CSV**
 - **Dark, modern UI** with brand icon, per-type shell icons, per-monitor high-DPI support
 - **Portable mode** — create an empty file named `SwiftFind.portable` next to the exe to keep all data beside it
+- **Global hotkey** `Ctrl+Alt+Space` brings SwiftFind to the front from anywhere; optional **close-to-tray** (Preferences)
+- Launching SwiftFind a second time brings the running window forward instead of opening a duplicate
 - Saved index loads on startup so search is available immediately
 
 ## Download
@@ -59,6 +61,7 @@ Combine freely: `budget ext:xlsx dm:month !old`
 | `Alt+Enter` | properties |
 | `Ctrl+E` | export results to CSV |
 | `F1` | search syntax help |
+| `Ctrl+Alt+Space` | global hotkey: bring SwiftFind to the front (can be turned off in Preferences) |
 
 ## Where data lives
 

@@ -272,6 +272,7 @@ namespace SwiftFind
                 if (f.ShowDialog(this) != DialogResult.OK) return;
                 settings.Save();
                 ApplyMenuState();
+                SetupTrayAndHotkey();
                 lblRoot.Text = "\uD83D\uDCC1  " + settings.RootPath;
                 if (f.IndexSettingsChanged)
                 {

@@ -15,17 +15,32 @@ namespace SwiftFind
             AppDomain.CurrentDomain.UnhandledException += (s, e) => ReportCrash("Unhandled", e.ExceptionObject as Exception);
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
 
+            string id = Environment.UserName;
             bool created;
-            using (var mutex = new Mutex(true, "SwiftFind.SingleInstance." + Environment.UserName, out created))
+            using (var mutex = new Mutex(true, "SwiftFind.SingleInstance." + id, out created))
+            using (var showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "SwiftFind.Show." + id))
             {
                 if (!created)
                 {
-                    MessageBox.Show("SwiftFind is already running.", "SwiftFind", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    // Already running: ask that instance to come to the front instead of showing an error.
+                    try { showEvent.Set(); } catch { }
                     return;
                 }
+
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
-                Application.Run(new MainForm());
+
+                var form = new MainForm();
+                RegisteredWaitHandle wait = null;
+                form.Shown += (s, e) =>
+                {
+                    wait = ThreadPool.RegisterWaitForSingleObject(showEvent, (state, timedOut) =>
+                    {
+                        try { if (!form.IsDisposed) form.BeginInvoke((Action)form.BringToFront2); } catch { }
+                    }, null, Timeout.Infinite, false);
+                };
+                Application.Run(form);
+                if (wait != null) wait.Unregister(null);
             }
         }
 

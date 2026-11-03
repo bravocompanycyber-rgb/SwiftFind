@@ -18,7 +18,7 @@ namespace SwiftFind.Forms
 
         TextBox txtRoot, txtExtensions;
         NumericUpDown numMax;
-        CheckBox chkAuto, chkFoldersFirst, chkColor, chkMatchPath;
+        CheckBox chkAuto, chkFoldersFirst, chkColor, chkMatchPath, chkHotkey, chkTray;
         ComboBox cmbGroup;
         ListBox lstFolders;
 
@@ -33,7 +33,7 @@ namespace SwiftFind.Forms
             StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = MaximizeBox = false;
             ShowInTaskbar = false;
-            ClientSize = new Size(600, 520);
+            ClientSize = new Size(600, 580);
 
             BuildTabs();
             BuildGeneral();
@@ -107,12 +107,14 @@ namespace SwiftFind.Forms
             chkFoldersFirst = Check("List folders before files", 246);
             chkColor = Check("Colour-code folders, favourites, recent and large files", 276);
             chkMatchPath = Check("Match search words against the full path, not just the name", 306);
-            general.Controls.AddRange(new Control[] { chkAuto, chkFoldersFirst, chkColor, chkMatchPath });
+            chkHotkey = Check("Global hotkey Ctrl+Alt+Space brings SwiftFind to the front", 336);
+            chkTray = Check("Closing the window keeps SwiftFind running in the tray", 366);
+            general.Controls.AddRange(new Control[] { chkAuto, chkFoldersFirst, chkColor, chkMatchPath, chkHotkey, chkTray });
 
             general.Controls.Add(new Label
             {
                 Text = "Tip: run SwiftFind as administrator on an NTFS drive for near-instant indexing.",
-                Left = 0, Top = 352, Width = 540, Height = 36, ForeColor = Theme.TextDim
+                Left = 0, Top = 404, Width = 540, Height = 36, ForeColor = Theme.TextDim
             });
         }
 
@@ -163,6 +165,8 @@ namespace SwiftFind.Forms
             chkFoldersFirst.Checked = settings.ShowFoldersFirst;
             chkColor.Checked = settings.ColorCode;
             chkMatchPath.Checked = settings.MatchPath;
+            chkHotkey.Checked = settings.GlobalHotkey;
+            chkTray.Checked = settings.CloseToTray;
             foreach (string f in settings.ExcludeFolders) lstFolders.Items.Add(f);
             txtExtensions.Text = string.Join(", ", settings.ExcludeExtensions.Select(x => x.TrimStart('.')));
         }
@@ -196,6 +200,8 @@ namespace SwiftFind.Forms
             settings.ShowFoldersFirst = chkFoldersFirst.Checked;
             settings.ColorCode = chkColor.Checked;
             settings.MatchPath = chkMatchPath.Checked;
+            settings.GlobalHotkey = chkHotkey.Checked;
+            settings.CloseToTray = chkTray.Checked;
             settings.ExcludeFolders = folders;
             settings.ExcludeExtensions = exts;
             return true;

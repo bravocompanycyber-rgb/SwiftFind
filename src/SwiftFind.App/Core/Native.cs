@@ -33,6 +33,26 @@ namespace SwiftFind.Core
             [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 80)] public string szTypeName;
         }
 
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint vk);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+        public const int WM_HOTKEY = 0x0312;
+        public const uint MOD_ALT = 0x1, MOD_CONTROL = 0x2, MOD_NOREPEAT = 0x4000;
+
+        public static bool TryRegisterHotKey(IntPtr hwnd, int id, uint modifiers, Keys key)
+        {
+            try { return RegisterHotKey(hwnd, id, modifiers | MOD_NOREPEAT, (uint)key); }
+            catch { return false; }
+        }
+
+        public static void UnregisterHotKeySafe(IntPtr hwnd, int id)
+        {
+            try { UnregisterHotKey(hwnd, id); } catch { }
+        }
+
         const uint SHGFI_ICON = 0x100;
         const uint SHGFI_SMALLICON = 0x1;
         const uint SHGFI_USEFILEATTRIBUTES = 0x10;

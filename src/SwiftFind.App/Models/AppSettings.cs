@@ -22,6 +22,8 @@ namespace SwiftFind.Models
         public bool ShowFoldersFirst = true;
         public string GroupBy = "None"; // None | Extension | Folder | Modified | Size
         public bool ColorCode = true;
+        public bool GlobalHotkey = true;   // Ctrl+Alt+Space brings SwiftFind to the front
+        public bool CloseToTray = false;
         public bool MatchPath = true;
         public string LastIndexMethod = "none";
         public long LastIndexTicks = 0;
@@ -53,6 +55,8 @@ namespace SwiftFind.Models
                         case "foldersfirst": s.ShowFoldersFirst = ParseBool(val, s.ShowFoldersFirst); break;
                         case "groupby": if (IsValidGroup(val)) s.GroupBy = val; break;
                         case "colorcode": s.ColorCode = ParseBool(val, s.ColorCode); break;
+                        case "hotkey": s.GlobalHotkey = ParseBool(val, s.GlobalHotkey); break;
+                        case "closetotray": s.CloseToTray = ParseBool(val, s.CloseToTray); break;
                         case "matchpath": s.MatchPath = ParseBool(val, s.MatchPath); break;
                         case "lastmethod": s.LastIndexMethod = val; break;
                         case "lastindex": long t; if (long.TryParse(val, NumberStyles.Integer, CultureInfo.InvariantCulture, out t)) s.LastIndexTicks = t; break;
@@ -90,6 +94,8 @@ namespace SwiftFind.Models
                 sb.AppendLine("FoldersFirst=" + (ShowFoldersFirst ? "1" : "0"));
                 sb.AppendLine("GroupBy=" + GroupBy);
                 sb.AppendLine("ColorCode=" + (ColorCode ? "1" : "0"));
+                sb.AppendLine("Hotkey=" + (GlobalHotkey ? "1" : "0"));
+                sb.AppendLine("CloseToTray=" + (CloseToTray ? "1" : "0"));
                 sb.AppendLine("MatchPath=" + (MatchPath ? "1" : "0"));
                 sb.AppendLine("LastMethod=" + LastIndexMethod);
                 sb.AppendLine("LastIndex=" + LastIndexTicks.ToString(CultureInfo.InvariantCulture));

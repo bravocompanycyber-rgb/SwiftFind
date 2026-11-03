@@ -74,7 +74,7 @@ namespace SwiftFind
             debounce = new System.Windows.Forms.Timer { Interval = 90 };
             debounce.Tick += (s, e) => { debounce.Stop(); ApplySearch(); };
 
-            Shown += (s, e) => { searchBox.Input.Focus(); LoadCacheThenMaybeIndex(); };
+            Shown += (s, e) => { searchBox.Input.Focus(); SetupTrayAndHotkey(); LoadCacheThenMaybeIndex(); };
             FormClosing += OnClosing;
         }
 
@@ -138,7 +138,7 @@ namespace SwiftFind
                 Item("Export results to CSV\u2026", Keys.Control | Keys.E, (s, e) => ExportCsv()),
                 Item("Open data folder", Keys.None, (s, e) => Reveal(AppPaths.DataDir, true)),
                 new ToolStripSeparator(),
-                Item("Exit", Keys.Alt | Keys.F4, (s, e) => Close())
+                Item("Exit", Keys.Alt | Keys.F4, (s, e) => { exiting = true; Close(); })
             });
 
             var view = new ToolStripMenuItem("View");
@@ -324,8 +324,15 @@ namespace SwiftFind
 
         void OnClosing(object sender, FormClosingEventArgs e)
         {
+            if (settings.CloseToTray && !exiting && e.CloseReason == CloseReason.UserClosing)
+            {
+                e.Cancel = true;
+                HideToTray();
+                return;
+            }
             try
             {
+                TeardownTrayAndHotkey();
                 CancelBackgroundWork();
                 var b = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
                 settings.WindowLeft = b.Left; settings.WindowTop = b.Top;
