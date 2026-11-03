@@ -1,64 +1,105 @@
-# SwiftFind
+<p align="center">
+  <img src="assets/symbol_512.png" alt="SwiftFind" width="160">
+</p>
 
-**Professional instant desktop search & Explorer-like file manager for Windows 8 – 11**
+<h1 align="center">SwiftFind</h1>
+<p align="center"><b>Fast desktop search &amp; indexing for Windows</b></p>
 
-SwiftFind is a fast, modern, crash-hardened file search utility with full file management capabilities. Built for speed, clarity, and control.
-
-![SwiftFind](assets/symbol_512.png)
+SwiftFind builds an index of a folder or drive and then searches it as you type. On NTFS drives it reads the Master File Table directly (run as administrator), so even millions of files index in seconds. On other drives it falls back to a safe folder scan.
 
 ## Features
 
-- **Instant real-time search** — results as you type
-- **Dual indexing** — optional NTFS USN Journal path (Everything-style speed) + solid recursive fallback
-- **Explorer-like actions** — open, rename, delete, copy / cut / paste, multi-select
-- **Advanced query syntax** — `ext:`, `size:>`, `dm:`, wildcards, regex
-- **Preferences & exclusions** — exclude folders and file types you choose
-- **Grouping & color coding** — by extension, folder, modified date, size
-- **Favorites, portable mode, persistent cache**
-- **Windows 8 / 8.1 / 10 / 11** via .NET Framework 4.8
+- **Instant search** while typing, on a background thread, so the window never freezes
+- **NTFS fast index** (MFT / USN) with automatic fallback to a folder scan
+- **Powerful query syntax** — wildcards, regex, size, date, extension, path, exclusions (see below)
+- **File actions** — open, open with, show in folder, copy / cut / paste, rename, **move to Recycle Bin**, properties, drag files out to other apps
+- **Favourites**, grouping (type, folder, date, size), colour coding, sortable columns
+- **Export results to CSV**
+- **Dark, modern UI** with brand icon, per-type shell icons, per-monitor high-DPI support
+- **Portable mode** — create an empty file named `SwiftFind.portable` next to the exe to keep all data beside it
+- Saved index loads on startup so search is available immediately
 
 ## Download
 
-Official builds are produced automatically by GitHub Actions.
+Grab `SwiftFind-portable-windows.zip` (or `SwiftFind.exe`) from the [Releases](../../releases) page. Requires Windows 7 or later with .NET Framework 4.8 (built into Windows 10 1903+ and Windows 11).
 
-1. Go to **Actions** → latest successful run → **Artifacts** → `SwiftFind-windows-x64`
-2. Or download from **Releases** (created when a version tag is pushed)
+> **Tip:** right-click `SwiftFind.exe` → *Run as administrator* once to unlock the NTFS fast index. Without it SwiftFind still works using the folder scan.
 
-```bash
-git tag v2.6.0
-git push origin v2.6.0
-```
+## Search syntax
+
+| You type | Meaning |
+|---|---|
+| `invoice 2026` | all words must match (name, or full path) |
+| `"annual report"` | exact phrase |
+| `report !draft` or `report -draft` | exclude matches |
+| `*.pdf`, `img_00?.jpg` | wildcards |
+| `ext:jpg;png` | one or more extensions |
+| `size:>10mb`, `size:<=1kb`, `size:1mb..5mb` | size filters |
+| `dm:today`, `dm:week`, `dm:2026-03-01`, `dm:>2026-01-01`, `dm:2026-01-01..2026-02-01` | modified date (`yesterday`, `month`, `year` also work) |
+| `path:projects` | match the full path only |
+| `file:` / `folder:` | only files / only folders |
+| `regex:^img_\d+` | regular expression (or `regex:` alone to treat every word as regex) |
+| `case:` | case-sensitive |
+
+Combine freely: `budget ext:xlsx dm:month !old`
+
+## Keyboard shortcuts
+
+| Key | Action |
+|---|---|
+| `Ctrl+F` / `Ctrl+L` | focus search |
+| `↓` / `Enter` in search | move into results / open first result |
+| `Enter` / `Ctrl+Enter` | open / show in folder |
+| `Ctrl+R` / `F5` | build or cancel index |
+| `Ctrl+B` | favourites only |
+| `Ctrl+D` | toggle favourite |
+| `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | copy / cut / paste files |
+| `Ctrl+Shift+C` | copy full path |
+| `F2` / `Del` | rename / move to Recycle Bin |
+| `Alt+Enter` | properties |
+| `Ctrl+E` | export results to CSV |
+| `F1` | search syntax help |
+
+## Where data lives
+
+| Mode | Location |
+|---|---|
+| Installed (default) | `%LOCALAPPDATA%\SwiftFind` |
+| Portable | next to `SwiftFind.exe` (when `SwiftFind.portable` exists) |
+
+Files: `settings.ini`, `index.cache`, `favorites.txt`, `crash.log`.
 
 ## Build from source
 
+Requires the .NET SDK (8.x is fine) on Windows.
+
 ```powershell
-cd src\SwiftFind.App
-msbuild SwiftFind.csproj /p:Configuration=Release
-# or
-dotnet build -c Release
+pwsh scripts/Build.ps1        # runs tests, then builds Release
+pwsh scripts/Build.ps1 -Run   # ...and launches it
 ```
 
-Requirements: Visual Studio 2019/2022 or Build Tools with .NET Framework 4.8 targeting pack.
+Output: `src/SwiftFind.App/bin/Release/net48/SwiftFind.exe`
 
-## Application icon
+Releases are produced by GitHub Actions: push a tag such as `v3.0.0` and the workflow tests, builds and publishes the zip with a SHA-256 checksum.
 
-Place `assets/SwiftFind.ico` in the repository (multi-resolution 16–256).  
-The project also embeds a runtime-generated matching icon so the window always looks correct.
-
-## Project layout
+## Repository layout
 
 ```
-src/SwiftFind.App/     # Main WinForms application
-  Helpers/AppIcon.cs   # Premium runtime icon
-  Indexing/            # USN + Recursive indexers
-  Search/              # Query engine
-  Forms/               # Preferences dialog
-  Models/              # FileEntry, AppSettings
-assets/                # Brand assets & .ico
-.github/workflows/     # CI build & release
-scripts/               # Build helpers
+assets/                  logo + icon set (embedded into the exe)
+src/SwiftFind.App/       the application
+  Core/                  paths, logging, Win32 helpers, theme
+  Controls/              flat button, search box
+  Forms/                 preferences, dialogs
+  Indexing/              USN (MFT) indexer, recursive indexer, details enricher
+  Search/                query parser + matcher (UI-free, unit-tested)
+  Services/              index cache, file operations, icon cache
+tests/SwiftFind.Tests/   dependency-free unit tests
+tools/NativeMftProbe/    stand-alone MFT diagnostic (not part of the app)
+docs/ARCHITECTURE.md     how it fits together
 ```
 
-## License
+## Troubleshooting
 
-Copyright © 2026 Bravo Company Cyber. All rights reserved.
+- **"NTFS fast index unavailable"** — run as administrator, and make sure the folder is on an NTFS drive.
+- **Something crashed** — *Help → View error log* (or open `crash.log` in the data folder).
+- **Index looks stale** — press `Ctrl+R`. Rename, delete and paste inside SwiftFind update the index automatically; changes made elsewhere need a rebuild.

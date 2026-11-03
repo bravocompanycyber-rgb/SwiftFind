@@ -1,0 +1,23 @@
+# Build output
+bin/
+obj/
+dist/
+release-package/
+*.exe
+*.pdb
+*.zip
+!assets/**
+
+# IDE / OS
+.vs/
+.vscode/
+*.user
+*.suo
+Thumbs.db
+.DS_Store
+
+# Local runtime data (portable mode)
+settings.ini
+index.cache
+favorites.txt
+crash.log

@@ -1,24 +1,11 @@
-# SwiftFind Brand Assets
+# Brand assets
 
-Original identity for **SwiftFind** — high-performance Windows file search.
+| File | Use |
+|---|---|
+| `SwiftFind.ico` | Application icon (16, 24, 32, 48, 64, 128, 256 px). Embedded in the exe and used as the file icon |
+| `logo_256.png` | Transparent logo mark shown in the app header and About dialog (embedded) |
+| `symbol_512.png` | Logo on a white rounded plate, used in the README |
+| `symbol_transparent_512.png` | Transparent logo mark for docs and web |
+| `preview_all_sizes.png` | Quick visual check of the icon at every size |
 
-## Files
-
-| File | Description |
-|------|-------------|
-| `SwiftFind.ico` | Multi-resolution Windows application icon (16–256 px) |
-| `symbol_512.png` | Primary symbol on blue plate |
-| `symbol_transparent_512.png` | Symbol only, transparent background |
-| `symbol_dark_512.png` | Dark plate variant |
-| `symbol_mono_512.png` | Monochrome version |
-| `preview_all_sizes.png` | Size ladder preview |
-
-## Usage in the project
-
-The `.csproj` references `assets/SwiftFind.ico` as the application icon.
-
-## Design notes
-
-- Geometric engineered mark combining speed, precision aperture, and structured form
-- Original work — not derived from existing commercial logos
-- Optimized for taskbar, Explorer, Alt+Tab, and installer surfaces
+These were derived from the supplied SwiftFind logo sheet. For the sharpest result, replace them with exports from the original vector artwork (SVG/AI) at 1024x1024 and regenerate the `.ico`.

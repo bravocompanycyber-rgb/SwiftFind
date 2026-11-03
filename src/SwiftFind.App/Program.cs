@@ -1,6 +1,7 @@
 using System;
+using System.Threading;
 using System.Windows.Forms;
-using SwiftFind.Helpers;
+using SwiftFind.Core;
 
 namespace SwiftFind
 {
@@ -9,18 +10,35 @@ namespace SwiftFind
         [STAThread]
         static void Main()
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
+            // One failure must never take the whole app (and unsaved state) down silently.
+            Application.ThreadException += (s, e) => ReportCrash("UI thread", e.Exception);
+            AppDomain.CurrentDomain.UnhandledException += (s, e) => ReportCrash("Unhandled", e.ExceptionObject as Exception);
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
 
-            var form = new MainForm();
+            bool created;
+            using (var mutex = new Mutex(true, "SwiftFind.SingleInstance." + Environment.UserName, out created))
+            {
+                if (!created)
+                {
+                    MessageBox.Show("SwiftFind is already running.", "SwiftFind", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                Application.Run(new MainForm());
+            }
+        }
+
+        static void ReportCrash(string where, Exception ex)
+        {
+            if (ex == null) return;
+            Log.Error(where, ex);
             try
             {
-                var icon = AppIcon.TryLoad();
-                if (icon != null) form.Icon = icon;
+                MessageBox.Show("Something went wrong, but your data is safe.\n\n" + ex.Message +
+                    "\n\nDetails were written to:\n" + AppPaths.LogFile, "SwiftFind", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             catch { }
-
-            Application.Run(form);
         }
     }
 }

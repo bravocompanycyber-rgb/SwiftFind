@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Dependency-free test runner (no NuGet packages). `dotnet run` exits non-zero on failure. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <RootNamespace>SwiftFind.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\SwiftFind.App\Search\SearchEngine.cs" Link="Linked\SearchEngine.cs" />
+    <Compile Include="..\..\src\SwiftFind.App\Models\FileEntry.cs" Link="Linked\FileEntry.cs" />
+    <Compile Include="..\..\src\SwiftFind.App\Indexing\PathFilter.cs" Link="Linked\PathFilter.cs" />
+  </ItemGroup>
+
+</Project>

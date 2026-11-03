@@ -1,107 +1,87 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using SwiftFind.Core;
 using SwiftFind.Models;
 
 namespace SwiftFind.Indexing
 {
+    /// <summary>
+    /// Portable directory walker. Works on every drive type and without elevated rights.
+    /// Uses EnumerateFileSystemInfos so size and timestamps arrive with the directory listing
+    /// (one syscall per directory instead of one per file).
+    /// </summary>
     public static class RecursiveIndexer
     {
-        public static List<FileEntry> Index(
-            string rootPath,
-            Action<int> progress = null,
-            HashSet<string> excludeFolders = null,
-            HashSet<string> excludeExtensions = null)
+        /// <returns>The entries found, or null when cancelled.</returns>
+        public static List<FileEntry> Index(string rootPath, PathFilter filter,
+                                            Action<int> progress = null, Func<bool> isCancelled = null)
         {
-            var found = new List<FileEntry>(128000);
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var stack = new Stack<string>();
-            stack.Push(rootPath);
+            var found = new List<FileEntry>(64000);
+            var stack = new Stack<DirectoryInfo>();
+            stack.Push(new DirectoryInfo(rootPath));
             int count = 0;
 
             while (stack.Count > 0)
             {
-                string dir = stack.Pop();
+                if (isCancelled != null && isCancelled()) return null;
+                DirectoryInfo dir = stack.Pop();
 
-                if (excludeFolders != null && (excludeFolders.Contains(dir) || IsUnderExcluded(dir, excludeFolders)))
+                if (filter != null && filter.HasFolderRules && filter.IsFolderExcluded(dir.FullName))
                     continue;
 
                 try
                 {
-                    foreach (string file in Directory.GetFiles(dir))
+                    foreach (FileSystemInfo fsi in dir.EnumerateFileSystemInfos())
                     {
                         try
                         {
-                            string ext = Path.GetExtension(file).ToLowerInvariant();
-                            if (excludeExtensions != null && excludeExtensions.Contains(ext))
-                                continue;
-
-                            // Hard deduplication
-                            if (!seen.Add(file))
-                                continue;
-
-                            var fi = new FileInfo(file);
-                            found.Add(new FileEntry
+                            bool isDir = (fsi.Attributes & FileAttributes.Directory) != 0;
+                            if (isDir)
                             {
-                                Name = fi.Name,
-                                FullPath = fi.FullName,
-                                Directory = fi.DirectoryName,
-                                Size = fi.Length,
-                                Modified = fi.LastWriteTime,
-                                IsDirectory = false
-                            });
+                                // Never follow junctions/symlinks: avoids loops and double-counting.
+                                if ((fsi.Attributes & FileAttributes.ReparsePoint) != 0) continue;
+                                if (filter != null && filter.HasFolderRules && filter.IsFolderExcluded(fsi.FullName)) continue;
+
+                                found.Add(new FileEntry
+                                {
+                                    Name = fsi.Name,
+                                    FullPath = fsi.FullName,
+                                    Directory = dir.FullName,
+                                    Size = 0,
+                                    Modified = fsi.LastWriteTime,
+                                    IsDirectory = true
+                                });
+                                stack.Push((DirectoryInfo)fsi);
+                            }
+                            else
+                            {
+                                var fi = (FileInfo)fsi;
+                                if (filter != null && filter.HasExtensionRules &&
+                                    filter.IsExtensionExcluded(Path.GetExtension(fi.Name).ToLowerInvariant()))
+                                    continue;
+
+                                found.Add(new FileEntry
+                                {
+                                    Name = fi.Name,
+                                    FullPath = fi.FullName,
+                                    Directory = dir.FullName,
+                                    Size = fi.Length,
+                                    Modified = fi.LastWriteTime,
+                                    IsDirectory = false
+                                });
+                            }
+
                             count++;
-                            if (progress != null && count % 2500 == 0)
-                                progress(count);
+                            if (progress != null && (count % 2500) == 0) progress(count);
                         }
-                        catch { }
-                    }
-
-                    foreach (string sub in Directory.GetDirectories(dir))
-                    {
-                        try
-                        {
-                            var di = new DirectoryInfo(sub);
-                            if ((di.Attributes & FileAttributes.ReparsePoint) != 0)
-                                continue;
-
-                            if (excludeFolders != null &&
-                                (excludeFolders.Contains(sub) || IsUnderExcluded(sub, excludeFolders)))
-                                continue;
-
-                            if (!seen.Add(sub))
-                                continue;
-
-                            found.Add(new FileEntry
-                            {
-                                Name = di.Name,
-                                FullPath = di.FullName,
-                                Directory = di.Parent != null ? di.Parent.FullName : "",
-                                Size = 0,
-                                Modified = di.LastWriteTime,
-                                IsDirectory = true
-                            });
-
-                            stack.Push(sub);
-                        }
-                        catch { }
+                        catch (Exception) { /* file vanished or is inaccessible: skip it */ }
                     }
                 }
-                catch { }
+                catch (Exception) { /* directory is inaccessible: skip it */ }
             }
-
+            if (progress != null) progress(count);
             return found;
-        }
-
-        static bool IsUnderExcluded(string path, HashSet<string> excludes)
-        {
-            foreach (string ex in excludes)
-            {
-                if (path.StartsWith(ex.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase) ||
-                    path.Equals(ex, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-            return false;
         }
     }
 }

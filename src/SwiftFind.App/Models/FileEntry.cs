@@ -4,6 +4,9 @@ namespace SwiftFind.Models
 {
     public class FileEntry
     {
+        /// <summary>Size value meaning "not read from disk yet" (fast USN indexing fills details in later).</summary>
+        public const long UnknownSize = -1;
+
         public string Name;
         public string FullPath;
         public string Directory;
@@ -15,15 +18,14 @@ namespace SwiftFind.Models
         {
             get
             {
-                if (IsDirectory) return string.Empty;
+                if (IsDirectory || Name == null) return string.Empty;
                 int i = Name.LastIndexOf('.');
                 return i >= 0 ? Name.Substring(i).ToLowerInvariant() : string.Empty;
             }
         }
 
-        public override string ToString()
-        {
-            return FullPath;
-        }
+        public bool HasDetails { get { return Size != UnknownSize; } }
+
+        public override string ToString() { return FullPath; }
     }
 }

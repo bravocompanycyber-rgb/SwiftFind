@@ -1,20 +1,23 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using SwiftFind.Core;
 
 namespace SwiftFind.Models
 {
-    /// <summary>
-    /// Persistent user preferences. Designed to be simple, readable and future-proof.
-    /// </summary>
+    /// <summary>Persistent user preferences stored as a simple, hand-editable INI file.</summary>
     public class AppSettings
     {
+        public const int MinResults = 500;
+        public const int MaxResultsLimit = 20000;
+
         public string RootPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         public List<string> ExcludeFolders = new List<string>();
-        public List<string> ExcludeExtensions = new List<string>(); // lowercase, with dot e.g. ".tmp"
-        public int MaxResults = 10000;
+        public List<string> ExcludeExtensions = new List<string>(); // lowercase with dot, e.g. ".tmp"
+        public int MaxResults = 5000;
         public bool AutoIndexOnStartup = false;
         public bool ShowFoldersFirst = true;
         public string GroupBy = "None"; // None | Extension | Folder | Modified | Size
@@ -23,52 +26,43 @@ namespace SwiftFind.Models
         public string LastIndexMethod = "none";
         public long LastIndexTicks = 0;
 
-        static string SettingsPath
-        {
-            get
-            {
-                // Portable mode takes priority
-                try
-                {
-                    string exeDir = AppDomain.CurrentDomain.BaseDirectory;
-                    if (File.Exists(Path.Combine(exeDir, "SwiftFind.portable")))
-                        return Path.Combine(exeDir, "settings.ini");
-                }
-                catch { }
-
-                string dir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "SwiftFind");
-                Directory.CreateDirectory(dir);
-                return Path.Combine(dir, "settings.ini");
-            }
-        }
+        // Window + list state
+        public int WindowLeft = -1, WindowTop = -1, WindowWidth = 1280, WindowHeight = 820;
+        public bool WindowMaximized = false;
+        public int SortColumn = 0;
+        public bool SortAscending = true;
 
         public static AppSettings Load()
         {
             var s = new AppSettings();
             try
             {
-                if (!File.Exists(SettingsPath)) return s;
-                foreach (string line in File.ReadAllLines(SettingsPath))
+                string path = AppPaths.SettingsFile;
+                if (!File.Exists(path)) return s;
+                foreach (string line in File.ReadAllLines(path))
                 {
-                    if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#") || !line.Contains("="))
-                        continue;
+                    if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#") || line.IndexOf('=') < 0) continue;
                     int eq = line.IndexOf('=');
-                    string key = line.Substring(0, eq).Trim();
+                    string key = line.Substring(0, eq).Trim().ToLowerInvariant();
                     string val = line.Substring(eq + 1).Trim();
-
-                    switch (key.ToLowerInvariant())
+                    switch (key)
                     {
-                        case "rootpath": s.RootPath = val; break;
-                        case "maxresults": int.TryParse(val, out s.MaxResults); break;
-                        case "autoindex": s.AutoIndexOnStartup = val == "1" || val.Equals("true", StringComparison.OrdinalIgnoreCase); break;
-                        case "foldersfirst": s.ShowFoldersFirst = val != "0" && !val.Equals("false", StringComparison.OrdinalIgnoreCase); break;
-                        case "groupby": s.GroupBy = val; break;
-                        case "colorcode": s.ColorCode = val != "0" && !val.Equals("false", StringComparison.OrdinalIgnoreCase); break;
-                        case "matchpath": s.MatchPath = val != "0" && !val.Equals("false", StringComparison.OrdinalIgnoreCase); break;
+                        case "rootpath": if (val.Length > 0) s.RootPath = val; break;
+                        case "maxresults": s.MaxResults = Clamp(ParseInt(val, s.MaxResults), MinResults, MaxResultsLimit); break;
+                        case "autoindex": s.AutoIndexOnStartup = ParseBool(val, s.AutoIndexOnStartup); break;
+                        case "foldersfirst": s.ShowFoldersFirst = ParseBool(val, s.ShowFoldersFirst); break;
+                        case "groupby": if (IsValidGroup(val)) s.GroupBy = val; break;
+                        case "colorcode": s.ColorCode = ParseBool(val, s.ColorCode); break;
+                        case "matchpath": s.MatchPath = ParseBool(val, s.MatchPath); break;
                         case "lastmethod": s.LastIndexMethod = val; break;
-                        case "lastindex": long.TryParse(val, out s.LastIndexTicks); break;
+                        case "lastindex": long t; if (long.TryParse(val, NumberStyles.Integer, CultureInfo.InvariantCulture, out t)) s.LastIndexTicks = t; break;
+                        case "windowleft": s.WindowLeft = ParseInt(val, s.WindowLeft); break;
+                        case "windowtop": s.WindowTop = ParseInt(val, s.WindowTop); break;
+                        case "windowwidth": s.WindowWidth = Clamp(ParseInt(val, s.WindowWidth), 600, 10000); break;
+                        case "windowheight": s.WindowHeight = Clamp(ParseInt(val, s.WindowHeight), 400, 10000); break;
+                        case "maximized": s.WindowMaximized = ParseBool(val, false); break;
+                        case "sortcolumn": s.SortColumn = Clamp(ParseInt(val, 0), 0, 4); break;
+                        case "sortasc": s.SortAscending = ParseBool(val, true); break;
                         case "excludefolder": if (!string.IsNullOrWhiteSpace(val)) s.ExcludeFolders.Add(val); break;
                         case "excludeext":
                             if (!string.IsNullOrWhiteSpace(val))
@@ -80,7 +74,7 @@ namespace SwiftFind.Models
                     }
                 }
             }
-            catch { /* never crash on settings */ }
+            catch (Exception ex) { Log.Error("Settings load", ex); }
             return s;
         }
 
@@ -89,33 +83,55 @@ namespace SwiftFind.Models
             try
             {
                 var sb = new StringBuilder();
-                sb.AppendLine("# SwiftFind settings – edit carefully or use Preferences dialog");
+                sb.AppendLine("# SwiftFind settings - edit carefully or use Tools > Preferences");
                 sb.AppendLine("RootPath=" + RootPath);
-                sb.AppendLine("MaxResults=" + MaxResults);
+                sb.AppendLine("MaxResults=" + MaxResults.ToString(CultureInfo.InvariantCulture));
                 sb.AppendLine("AutoIndex=" + (AutoIndexOnStartup ? "1" : "0"));
                 sb.AppendLine("FoldersFirst=" + (ShowFoldersFirst ? "1" : "0"));
                 sb.AppendLine("GroupBy=" + GroupBy);
                 sb.AppendLine("ColorCode=" + (ColorCode ? "1" : "0"));
                 sb.AppendLine("MatchPath=" + (MatchPath ? "1" : "0"));
                 sb.AppendLine("LastMethod=" + LastIndexMethod);
-                sb.AppendLine("LastIndex=" + LastIndexTicks);
+                sb.AppendLine("LastIndex=" + LastIndexTicks.ToString(CultureInfo.InvariantCulture));
+                sb.AppendLine("WindowLeft=" + WindowLeft);
+                sb.AppendLine("WindowTop=" + WindowTop);
+                sb.AppendLine("WindowWidth=" + WindowWidth);
+                sb.AppendLine("WindowHeight=" + WindowHeight);
+                sb.AppendLine("Maximized=" + (WindowMaximized ? "1" : "0"));
+                sb.AppendLine("SortColumn=" + SortColumn);
+                sb.AppendLine("SortAsc=" + (SortAscending ? "1" : "0"));
                 foreach (string f in ExcludeFolders.Distinct(StringComparer.OrdinalIgnoreCase))
                     sb.AppendLine("ExcludeFolder=" + f);
                 foreach (string e in ExcludeExtensions.Distinct(StringComparer.OrdinalIgnoreCase))
                     sb.AppendLine("ExcludeExt=" + e);
-                File.WriteAllText(SettingsPath, sb.ToString(), Encoding.UTF8);
+
+                // Write-then-replace so a crash mid-save can never leave a half-written file.
+                string path = AppPaths.SettingsFile;
+                string tmp = path + ".tmp";
+                File.WriteAllText(tmp, sb.ToString(), new UTF8Encoding(false));
+                if (File.Exists(path)) File.Delete(path);
+                File.Move(tmp, path);
             }
-            catch { }
+            catch (Exception ex) { Log.Error("Settings save", ex); }
         }
 
-        public HashSet<string> GetExcludeFolderSet()
-        {
-            return new HashSet<string>(ExcludeFolders, StringComparer.OrdinalIgnoreCase);
-        }
+        public HashSet<string> GetExcludeFolderSet() { return new HashSet<string>(ExcludeFolders, StringComparer.OrdinalIgnoreCase); }
+        public HashSet<string> GetExcludeExtSet() { return new HashSet<string>(ExcludeExtensions, StringComparer.OrdinalIgnoreCase); }
 
-        public HashSet<string> GetExcludeExtSet()
+        static bool IsValidGroup(string v)
         {
-            return new HashSet<string>(ExcludeExtensions, StringComparer.OrdinalIgnoreCase);
+            return v == "None" || v == "Extension" || v == "Folder" || v == "Modified" || v == "Size";
         }
+        static int ParseInt(string v, int fallback)
+        {
+            int r; return int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out r) ? r : fallback;
+        }
+        static bool ParseBool(string v, bool fallback)
+        {
+            if (v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase)) return true;
+            if (v == "0" || v.Equals("false", StringComparison.OrdinalIgnoreCase)) return false;
+            return fallback;
+        }
+        static int Clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
     }
 }
