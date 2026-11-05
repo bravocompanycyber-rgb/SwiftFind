@@ -35,7 +35,7 @@ namespace SwiftFind
             {
                 if (IsDisposed) return;
                 IndexStore.Snapshot snap = t.IsFaulted ? null : t.Result;
-                bool sameRoot = snap != null && string.Equals(snap.Root, settings.RootPath, StringComparison.OrdinalIgnoreCase);
+                bool sameRoot = snap != null && string.Equals(snap.Root, IndexScope.Key(settings), StringComparison.OrdinalIgnoreCase);
                 if (sameRoot)
                 {
                     index = snap.Entries.ToArray();
@@ -44,7 +44,10 @@ namespace SwiftFind
                 }
                 SetStatus("Ready");
 
-                if (settings.AutoIndexOnStartup) StartIndexing();
+                // Index automatically on first run, when the saved index doesn't match, or when it is old and refreshing is cheap (admin + NTFS).
+                bool stale = sameRoot && indexBuiltAt != DateTime.MinValue && (DateTime.Now - indexBuiltAt).TotalHours > 6;
+                bool cheapRefresh = stale && indexMethod != "scan" && IsAdministrator();
+                if (settings.AutoIndexOnStartup || !sameRoot || index.Length == 0 || cheapRefresh) StartIndexing();
                 else
                 {
                     ApplySearch();
@@ -64,10 +67,10 @@ namespace SwiftFind
         void StartIndexing()
         {
             if (indexing) return;
-            string root = settings.RootPath;
-            if (!Directory.Exists(root))
+            List<string> roots = IndexScope.Roots(settings);
+            if (!settings.IndexAllDrives && !Directory.Exists(settings.RootPath))
             {
-                MessageBox.Show(this, "The folder to index doesn't exist:\n" + root + "\n\nChoose another folder.", "SwiftFind", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, "The folder to index doesn't exist:\n" + settings.RootPath + "\n\nChoose another folder, or switch to searching everywhere.", "SwiftFind", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -77,27 +80,48 @@ namespace SwiftFind
             btnIndex.Text = "Cancel";
             btnIndex.SetStyle(SwiftFind.Controls.FlatButton.Style.Primary);
             HideEmpty();
-            SetStatus("Indexing " + root + "\u2026", true);
+            SetStatus("Indexing " + IndexScope.Describe(settings) + "\u2026", true);
 
             var filter = new PathFilter(settings.ExcludeFolders, settings.ExcludeExtensions);
+            int baseCount = 0;
             Action<int> progress = n =>
             {
-                try { BeginInvoke((Action)(() => { if (indexing) lblCount.Text = n.ToString("N0") + " items\u2026"; })); } catch { }
+                int total = baseCount + n;
+                try { BeginInvoke((Action)(() => { if (indexing) lblCount.Text = total.ToString("N0") + " items\u2026"; })); } catch { }
             };
 
             Task.Factory.StartNew(() =>
             {
-                var outcome = new IndexOutcome { Method = "scan" };
+                var outcome = new IndexOutcome { Entries = new List<FileEntry>() };
                 Func<bool> cancelled = () => cts.IsCancellationRequested;
-                if (UsnIndexer.IsSupported(root))
+                int usnCount = 0, scanCount = 0;
+
+                for (int i = 0; i < roots.Count; i++)
                 {
-                    outcome.Entries = UsnIndexer.TryIndex(root, filter, progress, cancelled);
-                    if (outcome.Entries != null) outcome.Method = "usn";
-                    else outcome.FallbackReason = UsnIndexer.LastFailure;
+                    string root = roots[i];
+                    if (cancelled()) return null;
+                    string label = roots.Count > 1 ? "Indexing " + root.TrimEnd('\\') + "  (" + (i + 1) + " of " + roots.Count + ")\u2026" : "Indexing " + root + "\u2026";
+                    try { BeginInvoke((Action)(() => { if (indexing) SetStatus(label, true); })); } catch { }
+
+                    List<FileEntry> part = null;
+                    if (UsnIndexer.IsSupported(root))
+                    {
+                        part = UsnIndexer.TryIndex(root, filter, progress, cancelled);
+                        if (part != null) usnCount++;
+                        else if (outcome.FallbackReason == null) outcome.FallbackReason = UsnIndexer.LastFailure;
+                    }
+                    if (cancelled()) return null;
+                    if (part == null)
+                    {
+                        part = RecursiveIndexer.Index(root, filter, progress, cancelled);
+                        if (part == null) return null;
+                        scanCount++;
+                    }
+                    outcome.Entries.AddRange(part);
+                    baseCount = outcome.Entries.Count;
                 }
-                if (cts.IsCancellationRequested) return null;
-                if (outcome.Entries == null) outcome.Entries = RecursiveIndexer.Index(root, filter, progress, cancelled);
-                return outcome.Entries == null ? null : outcome;
+                outcome.Method = scanCount == 0 ? "usn" : (usnCount == 0 ? "scan" : "mixed");
+                return outcome;
             }, cts.Token).ContinueWith(t =>
             {
                 indexing = false;
@@ -126,11 +150,11 @@ namespace SwiftFind
                 ApplySearch();
 
                 string note = "";
-                if (result.Method == "scan" && result.FallbackReason != null)
+                if (result.Method != "usn" && result.FallbackReason != null)
                     note = "  (NTFS fast index unavailable: " + result.FallbackReason + ")";
                 SetStatus("Indexed " + index.Length.ToString("N0") + " items." + note);
 
-                if (result.Method == "usn") StartEnrichment();
+                if (result.Method != "scan") StartEnrichment();
             }, TaskScheduler.FromCurrentSynchronizationContext());
         }
 
@@ -177,7 +201,7 @@ namespace SwiftFind
             if (!cacheDirty) return;
             cacheDirty = false;
             FileEntry[] snapshot = index;
-            string root = settings.RootPath, method = indexMethod;
+            string root = IndexScope.Key(settings), method = indexMethod;
             DateTime built = indexBuiltAt;
             Task.Factory.StartNew(() => IndexStore.Save(root, method, built, snapshot));
         }
@@ -186,7 +210,7 @@ namespace SwiftFind
         {
             if (!cacheDirty || index.Length == 0) return;
             cacheDirty = false;
-            IndexStore.Save(settings.RootPath, indexMethod, indexBuiltAt, index);
+            IndexStore.Save(IndexScope.Key(settings), indexMethod, indexBuiltAt, index);
         }
 
         /// <summary>Debounced save after small edits (rename, delete, paste).</summary>
@@ -248,6 +272,46 @@ namespace SwiftFind
             catch (Exception ex) { Log.Error("Add to index", ex); }
         }
 
+        // ================================================================ scope
+
+        void UpdateScopeLabel()
+        {
+            lblRoot.Text = "\uD83D\uDCC1  " + IndexScope.Describe(settings);
+        }
+
+        void UseEverywhere()
+        {
+            if (settings.IndexAllDrives) return;
+            settings.IndexAllDrives = true;
+            settings.Save();
+            UpdateScopeLabel();
+            index = new FileEntry[0];
+            ApplySearch();
+            StartIndexing();
+        }
+
+        /// <summary>Relaunches elevated so the NTFS fast index (MFT) becomes available.</summary>
+        void RestartAsAdministrator()
+        {
+            try
+            {
+                FlushCacheIfDirty();
+                var psi = new System.Diagnostics.ProcessStartInfo(Application.ExecutablePath, "--wait-for-previous")
+                {
+                    UseShellExecute = true,
+                    Verb = "runas"
+                };
+                System.Diagnostics.Process.Start(psi);
+                exiting = true;
+                Close();
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                SetStatus("Administrator restart was cancelled.");
+            }
+            catch (Exception ex) { Log.Error("Restart as admin", ex); }
+        }
+
         // ================================================================ folder / preferences
 
         void ChooseFolder()
@@ -255,10 +319,11 @@ namespace SwiftFind
             using (var d = new FolderBrowserDialog { Description = "Choose the folder or drive to index", SelectedPath = settings.RootPath })
             {
                 if (d.ShowDialog(this) != DialogResult.OK) return;
-                if (string.Equals(d.SelectedPath, settings.RootPath, StringComparison.OrdinalIgnoreCase)) return;
+                if (!settings.IndexAllDrives && string.Equals(d.SelectedPath, settings.RootPath, StringComparison.OrdinalIgnoreCase)) return;
                 settings.RootPath = d.SelectedPath;
+                settings.IndexAllDrives = false;
                 settings.Save();
-                lblRoot.Text = "\uD83D\uDCC1  " + settings.RootPath;
+                UpdateScopeLabel();
                 index = new FileEntry[0];
                 ApplySearch();
                 StartIndexing();
@@ -273,7 +338,7 @@ namespace SwiftFind
                 settings.Save();
                 ApplyMenuState();
                 SetupTrayAndHotkey();
-                lblRoot.Text = "\uD83D\uDCC1  " + settings.RootPath;
+                UpdateScopeLabel();
                 if (f.IndexSettingsChanged)
                 {
                     var r = MessageBox.Show(this, "Your folder or exclusion settings changed.\nRebuild the index now?", "Preferences", MessageBoxButtons.YesNo, MessageBoxIcon.Question);

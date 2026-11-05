@@ -12,6 +12,13 @@ A ground-up quality pass: new design, new brand assets, many correctness fixes.
 - Window size, position, maximised state and sort order are remembered
 - Per-monitor high-DPI support (manifest + DPI-aware layout)
 
+### Search everywhere
+- New default: SwiftFind indexes **all local drives** (optionally USB drives) into one index and searches them together — no folder to choose. A single folder is still available from *Search scope* or Preferences
+- Indexes automatically on first run, whenever the saved index doesn't match the chosen scope, and in the background at startup when the index is over 6 hours old (administrator + NTFS only, where refreshing takes seconds)
+- Mixed setups work: NTFS drives use the fast index, others fall back to a scan, per drive
+- *File → Restart as administrator* relaunches elevated (and hands over cleanly from the old instance)
+- Progress shows which drive is being indexed
+
 ### Everyday use
 - Global hotkey `Ctrl+Alt+Space` (falls back gracefully if another program already owns it) and optional close-to-tray with a tray menu
 - Starting SwiftFind again focuses the running instance instead of showing an error

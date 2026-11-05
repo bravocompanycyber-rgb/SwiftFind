@@ -22,6 +22,8 @@ namespace SwiftFind.Models
         public bool ShowFoldersFirst = true;
         public string GroupBy = "None"; // None | Extension | Folder | Modified | Size
         public bool ColorCode = true;
+        public bool IndexAllDrives = true;      // search everywhere (all local drives) instead of one folder
+        public bool IncludeRemovable = true;    // include USB / removable drives when searching everywhere
         public bool GlobalHotkey = true;   // Ctrl+Alt+Space brings SwiftFind to the front
         public bool CloseToTray = false;
         public bool MatchPath = true;
@@ -55,6 +57,8 @@ namespace SwiftFind.Models
                         case "foldersfirst": s.ShowFoldersFirst = ParseBool(val, s.ShowFoldersFirst); break;
                         case "groupby": if (IsValidGroup(val)) s.GroupBy = val; break;
                         case "colorcode": s.ColorCode = ParseBool(val, s.ColorCode); break;
+                        case "everywhere": s.IndexAllDrives = ParseBool(val, s.IndexAllDrives); break;
+                        case "removable": s.IncludeRemovable = ParseBool(val, s.IncludeRemovable); break;
                         case "hotkey": s.GlobalHotkey = ParseBool(val, s.GlobalHotkey); break;
                         case "closetotray": s.CloseToTray = ParseBool(val, s.CloseToTray); break;
                         case "matchpath": s.MatchPath = ParseBool(val, s.MatchPath); break;
@@ -94,6 +98,8 @@ namespace SwiftFind.Models
                 sb.AppendLine("FoldersFirst=" + (ShowFoldersFirst ? "1" : "0"));
                 sb.AppendLine("GroupBy=" + GroupBy);
                 sb.AppendLine("ColorCode=" + (ColorCode ? "1" : "0"));
+                sb.AppendLine("Everywhere=" + (IndexAllDrives ? "1" : "0"));
+                sb.AppendLine("Removable=" + (IncludeRemovable ? "1" : "0"));
                 sb.AppendLine("Hotkey=" + (GlobalHotkey ? "1" : "0"));
                 sb.AppendLine("CloseToTray=" + (CloseToTray ? "1" : "0"));
                 sb.AppendLine("MatchPath=" + (MatchPath ? "1" : "0"));

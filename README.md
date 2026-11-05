@@ -5,10 +5,11 @@
 <h1 align="center">SwiftFind</h1>
 <p align="center"><b>Fast desktop search &amp; indexing for Windows</b></p>
 
-SwiftFind builds an index of a folder or drive and then searches it as you type. On NTFS drives it reads the Master File Table directly (run as administrator), so even millions of files index in seconds. On other drives it falls back to a safe folder scan.
+SwiftFind indexes **everything on your PC** — every local drive (and USB drives, if you like) — and searches it all at once as you type. You never have to pick a folder; if you prefer, you can limit it to one folder from the *Search scope* button. On NTFS drives it reads the Master File Table directly (run as administrator), so even millions of files index in seconds. On other drives it falls back to a safe folder scan.
 
 ## Features
 
+- **Search everywhere by default** — all drives indexed automatically on first run, kept fresh in the background
 - **Instant search** while typing, on a background thread, so the window never freezes
 - **NTFS fast index** (MFT / USN) with automatic fallback to a folder scan
 - **Powerful query syntax** — wildcards, regex, size, date, extension, path, exclusions (see below)
@@ -25,7 +26,7 @@ SwiftFind builds an index of a folder or drive and then searches it as you type.
 
 Grab `SwiftFind-portable-windows.zip` (or `SwiftFind.exe`) from the [Releases](../../releases) page. Requires Windows 7 or later with .NET Framework 4.8 (built into Windows 10 1903+ and Windows 11).
 
-> **Tip:** right-click `SwiftFind.exe` → *Run as administrator* once to unlock the NTFS fast index. Without it SwiftFind still works using the folder scan.
+> **Tip:** use *File → Restart as administrator* once to unlock the NTFS fast index (an entire drive in seconds). Without it SwiftFind still works, but scanning a whole drive takes minutes instead.
 
 ## Search syntax
 

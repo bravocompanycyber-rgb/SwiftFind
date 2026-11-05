@@ -17,6 +17,8 @@ namespace SwiftFind.Forms
         FlatButton tabGeneral, tabExclusions;
 
         TextBox txtRoot, txtExtensions;
+        RadioButton radAll, radFolder;
+        CheckBox chkRemovable;
         NumericUpDown numMax;
         CheckBox chkAuto, chkFoldersFirst, chkColor, chkMatchPath, chkHotkey, chkTray;
         ComboBox cmbGroup;
@@ -33,7 +35,7 @@ namespace SwiftFind.Forms
             StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = MaximizeBox = false;
             ShowInTaskbar = false;
-            ClientSize = new Size(600, 580);
+            ClientSize = new Size(600, 660);
 
             BuildTabs();
             BuildGeneral();
@@ -83,39 +85,50 @@ namespace SwiftFind.Forms
 
         void BuildGeneral()
         {
-            general.Controls.Add(Caption("Folder to index", 8));
-            txtRoot = Input(0, 32, 430);
-            var browse = new FlatButton("Browse\u2026") { Left = 440, Top = 29, Width = 100, Height = 30 };
+            general.Controls.Add(Caption("What to search", 4));
+            radAll = new RadioButton { Text = "Everywhere \u2014 index and search all drives together", Left = 0, Top = 28, Width = 540, Height = 24, ForeColor = Theme.Text, FlatStyle = FlatStyle.Flat };
+            chkRemovable = new CheckBox { Text = "Include removable drives (USB sticks, SD cards)", Left = 24, Top = 54, Width = 516, Height = 24, ForeColor = Theme.Text, FlatStyle = FlatStyle.Flat };
+            radFolder = new RadioButton { Text = "Only this folder:", Left = 0, Top = 86, Width = 540, Height = 24, ForeColor = Theme.Text, FlatStyle = FlatStyle.Flat };
+            txtRoot = Input(24, 114, 406);
+            var browse = new FlatButton("Browse\u2026") { Left = 440, Top = 111, Width = 100, Height = 30 };
             browse.Click += (s, e) =>
             {
-                using (var d = new FolderBrowserDialog { Description = "Choose the folder or drive to index", SelectedPath = txtRoot.Text })
-                    if (d.ShowDialog(this) == DialogResult.OK) txtRoot.Text = d.SelectedPath;
+                using (var d = new FolderBrowserDialog { Description = "Choose the folder to index", SelectedPath = txtRoot.Text })
+                    if (d.ShowDialog(this) == DialogResult.OK) { txtRoot.Text = d.SelectedPath; radFolder.Checked = true; }
             };
-            general.Controls.AddRange(new Control[] { txtRoot, browse });
+            radAll.CheckedChanged += (s, e) => SyncScopeControls();
+            radFolder.CheckedChanged += (s, e) => SyncScopeControls();
+            general.Controls.AddRange(new Control[] { radAll, chkRemovable, radFolder, txtRoot, browse });
 
-            general.Controls.Add(Caption("Maximum results shown (more = slower list)", 76));
-            numMax = new NumericUpDown { Left = 0, Top = 100, Width = 120, Minimum = AppSettings.MinResults, Maximum = AppSettings.MaxResultsLimit, Increment = 500, BackColor = Theme.Surface, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle };
+            general.Controls.Add(Caption("Maximum results shown (more = slower list)", 162));
+            numMax = new NumericUpDown { Left = 0, Top = 186, Width = 120, Minimum = AppSettings.MinResults, Maximum = AppSettings.MaxResultsLimit, Increment = 500, BackColor = Theme.Surface, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle };
             general.Controls.Add(numMax);
 
-            general.Controls.Add(Caption("Group results by", 142));
-            cmbGroup = new ComboBox { Left = 0, Top = 166, Width = 200 };
+            general.Controls.Add(Caption("Group results by", 224));
+            cmbGroup = new ComboBox { Left = 0, Top = 248, Width = 200 };
             Theme.StyleCombo(cmbGroup);
             cmbGroup.Items.AddRange(new object[] { "None", "Extension", "Folder", "Modified", "Size" });
             general.Controls.Add(cmbGroup);
 
-            chkAuto = Check("Rebuild the index automatically when SwiftFind starts", 216);
-            chkFoldersFirst = Check("List folders before files", 246);
-            chkColor = Check("Colour-code folders, favourites, recent and large files", 276);
-            chkMatchPath = Check("Match search words against the full path, not just the name", 306);
-            chkHotkey = Check("Global hotkey Ctrl+Alt+Space brings SwiftFind to the front", 336);
-            chkTray = Check("Closing the window keeps SwiftFind running in the tray", 366);
+            chkAuto = Check("Rebuild the index every time SwiftFind starts", 292);
+            chkFoldersFirst = Check("List folders before files", 322);
+            chkColor = Check("Colour-code folders, favourites, recent and large files", 352);
+            chkMatchPath = Check("Match search words against the full path, not just the name", 382);
+            chkHotkey = Check("Global hotkey Ctrl+Alt+Space brings SwiftFind to the front", 412);
+            chkTray = Check("Closing the window keeps SwiftFind running in the tray", 442);
             general.Controls.AddRange(new Control[] { chkAuto, chkFoldersFirst, chkColor, chkMatchPath, chkHotkey, chkTray });
 
             general.Controls.Add(new Label
             {
-                Text = "Tip: run SwiftFind as administrator on an NTFS drive for near-instant indexing.",
-                Left = 0, Top = 404, Width = 540, Height = 36, ForeColor = Theme.TextDim
+                Text = "Tip: run SwiftFind as administrator for near-instant indexing of NTFS drives (File menu \u2192 Restart as administrator).",
+                Left = 0, Top = 480, Width = 540, Height = 40, ForeColor = Theme.TextDim
             });
+        }
+
+        void SyncScopeControls()
+        {
+            chkRemovable.Enabled = radAll.Checked;
+            txtRoot.Enabled = radFolder.Checked;
         }
 
         void BuildExclusions()
@@ -158,6 +171,10 @@ namespace SwiftFind.Forms
         void LoadValues()
         {
             txtRoot.Text = settings.RootPath;
+            radAll.Checked = settings.IndexAllDrives;
+            radFolder.Checked = !settings.IndexAllDrives;
+            chkRemovable.Checked = settings.IncludeRemovable;
+            SyncScopeControls();
             numMax.Value = Math.Max(numMax.Minimum, Math.Min(numMax.Maximum, settings.MaxResults));
             cmbGroup.SelectedItem = settings.GroupBy;
             if (cmbGroup.SelectedIndex < 0) cmbGroup.SelectedIndex = 0;
@@ -174,12 +191,13 @@ namespace SwiftFind.Forms
         bool Apply()
         {
             string root = txtRoot.Text.Trim();
-            if (!System.IO.Directory.Exists(root))
+            if (radFolder.Checked && !System.IO.Directory.Exists(root))
             {
                 ShowPage(true);
                 MessageBox.Show(this, "That folder doesn't exist:\n" + root, "Preferences", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
+            if (root.Length == 0 || !System.IO.Directory.Exists(root)) root = settings.RootPath; // keep the previous folder when searching everywhere
 
             var folders = lstFolders.Items.Cast<string>().ToList();
             var exts = txtExtensions.Text
@@ -189,11 +207,15 @@ namespace SwiftFind.Forms
                 .Distinct().ToList();
 
             IndexSettingsChanged =
-                !string.Equals(root, settings.RootPath, StringComparison.OrdinalIgnoreCase) ||
+                settings.IndexAllDrives != radAll.Checked ||
+                (radAll.Checked && settings.IncludeRemovable != chkRemovable.Checked) ||
+                (radFolder.Checked && !string.Equals(root, settings.RootPath, StringComparison.OrdinalIgnoreCase)) ||
                 !folders.OrderBy(x => x).SequenceEqual(settings.ExcludeFolders.OrderBy(x => x), StringComparer.OrdinalIgnoreCase) ||
                 !exts.OrderBy(x => x).SequenceEqual(settings.ExcludeExtensions.OrderBy(x => x));
 
             settings.RootPath = root;
+            settings.IndexAllDrives = radAll.Checked;
+            settings.IncludeRemovable = chkRemovable.Checked;
             settings.MaxResults = (int)numMax.Value;
             settings.GroupBy = (string)cmbGroup.SelectedItem ?? "None";
             settings.AutoIndexOnStartup = chkAuto.Checked;

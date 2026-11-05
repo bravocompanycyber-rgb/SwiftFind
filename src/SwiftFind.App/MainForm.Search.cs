@@ -13,6 +13,7 @@ using SwiftFind.Core;
 using SwiftFind.Forms;
 using SwiftFind.Models;
 using SwiftFind.Search;
+using SwiftFind.Services;
 
 namespace SwiftFind
 {
@@ -112,7 +113,7 @@ namespace SwiftFind
             PopulateList(r.Items);
 
             bool hasIndex = indexSize > 0;
-            if (!hasIndex && !indexing) ShowEmpty("No index yet\n\nChoose a folder, then press  Build index  (Ctrl+R)");
+            if (!hasIndex && !indexing) ShowEmpty("No index yet\n\nPress  Build index  (Ctrl+R) to index everything on this PC.");
             else if (r.Error != null) ShowEmpty(r.Error);
             else if (r.Items.Count == 0 && hasIndex) ShowEmpty("No results\n\nTry fewer words, or check the type, size and date filters.");
             else HideEmpty();
@@ -295,7 +296,7 @@ namespace SwiftFind
         void UpdateIndexInfo()
         {
             if (index.Length == 0) { lblIndexInfo.Text = ""; return; }
-            string method = indexMethod == "usn" ? "NTFS fast index" : "folder scan";
+            string method = indexMethod == "usn" ? "NTFS fast index" : (indexMethod == "mixed" ? "fast index + scan" : "folder scan");
             string age = indexBuiltAt == DateTime.MinValue ? "" : "  \u2022  updated " + Ago(indexBuiltAt);
             lblIndexInfo.Text = index.Length.ToString("N0", CultureInfo.CurrentCulture) + " items  \u2022  " + method + age;
         }
@@ -382,7 +383,7 @@ namespace SwiftFind
         {
             var sb = new StringBuilder();
             sb.AppendLine("Index:  " + index.Length.ToString("N0") + " items (" + (indexMethod == "usn" ? "NTFS fast index" : indexMethod) + ")");
-            sb.AppendLine("Folder: " + settings.RootPath);
+            sb.AppendLine("Scope:  " + IndexScope.Describe(settings));
             sb.AppendLine("Data:   " + AppPaths.DataDir + (AppPaths.IsPortable ? "  (portable mode)" : ""));
             sb.AppendLine("Admin:  " + (IsAdministrator() ? "yes - NTFS fast indexing available" : "no - run as administrator for fast NTFS indexing"));
             sb.AppendLine();

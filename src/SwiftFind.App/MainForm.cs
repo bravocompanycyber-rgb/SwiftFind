@@ -45,7 +45,8 @@ namespace SwiftFind
         ContextMenuStrip rowMenu;
         ToolStripMenuItem miFavorite, miRename, miPaste, miOpenWith;
         readonly Dictionary<string, ToolStripMenuItem> groupItems = new Dictionary<string, ToolStripMenuItem>();
-        ToolStripMenuItem miFoldersFirst, miColor, miMatchPath, miFavOnly;
+        ToolStripMenuItem miFoldersFirst, miColor, miMatchPath, miFavOnly, miScopeAll, miScopeFolder, miAdmin;
+        ContextMenuStrip scopeMenu;
 
         static readonly string[] ColumnNames = { "Name", "Location", "Size", "Modified", "Type" };
 
@@ -132,11 +133,13 @@ namespace SwiftFind
             var file = new ToolStripMenuItem("File");
             file.DropDownItems.AddRange(new ToolStripItem[]
             {
-                Item("Choose folder\u2026", Keys.Control | Keys.O, (s, e) => ChooseFolder()),
+                Item("Search a specific folder\u2026", Keys.Control | Keys.O, (s, e) => ChooseFolder()),
+                Item("Search everywhere (all drives)", Keys.None, (s, e) => UseEverywhere()),
                 Item("Build / rebuild index", Keys.Control | Keys.R, (s, e) => ToggleIndexing()),
                 new ToolStripSeparator(),
                 Item("Export results to CSV\u2026", Keys.Control | Keys.E, (s, e) => ExportCsv()),
                 Item("Open data folder", Keys.None, (s, e) => Reveal(AppPaths.DataDir, true)),
+                (miAdmin = Item("Restart as administrator (fast NTFS index)", Keys.None, (s, e) => RestartAsAdministrator())),
                 new ToolStripSeparator(),
                 Item("Exit", Keys.Alt | Keys.F4, (s, e) => { exiting = true; Close(); })
             });
@@ -172,6 +175,7 @@ namespace SwiftFind
                 Item("About SwiftFind", Keys.None, (s, e) => ShowAbout())
             });
 
+            miAdmin.Visible = !IsAdministrator();
             menu.Items.AddRange(new ToolStripItem[] { file, view, tools, help });
             MainMenuStrip = menu;
         }
@@ -221,10 +225,11 @@ namespace SwiftFind
             folderRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             lblRoot = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, ForeColor = Theme.TextMuted, AutoEllipsis = true };
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, Margin = new Padding(0) };
-            btnChoose = new FlatButton("Choose folder\u2026") { Width = 156, Margin = new Padding(0, 6, 8, 6) };
+            btnChoose = new FlatButton("Search scope \u25BE") { Width = 156, Margin = new Padding(0, 6, 8, 6) };
             btnFavorites = new FlatButton("\u2605 Favourites") { Width = 130, Margin = new Padding(0, 6, 8, 6) };
             btnIndex = new FlatButton("Build index", FlatButton.Style.Orange) { Width = 130, Margin = new Padding(0, 6, 0, 6) };
-            btnChoose.Click += (s, e) => ChooseFolder();
+            BuildScopeMenu();
+            btnChoose.Click += (s, e) => scopeMenu.Show(btnChoose, new Point(0, btnChoose.Height));
             btnFavorites.Click += (s, e) => ToggleFavoritesView();
             btnIndex.Click += (s, e) => ToggleIndexing();
             buttons.Controls.AddRange(new Control[] { btnChoose, btnFavorites, btnIndex });
@@ -290,7 +295,16 @@ namespace SwiftFind
             Controls.Add(menu);
             root.BringToFront();
 
-            lblRoot.Text = "\uD83D\uDCC1  " + settings.RootPath;
+            UpdateScopeLabel();
+        }
+
+        void BuildScopeMenu()
+        {
+            scopeMenu = new ContextMenuStrip { Renderer = new DarkRenderer(), BackColor = Theme.Panel, ForeColor = Theme.Text, Font = Theme.Ui(9.5f) };
+            miScopeAll = Item("Everywhere (all drives)", Keys.None, (s, e) => UseEverywhere());
+            miScopeFolder = Item("A specific folder\u2026", Keys.None, (s, e) => ChooseFolder());
+            scopeMenu.Items.AddRange(new ToolStripItem[] { miScopeAll, miScopeFolder });
+            scopeMenu.Opening += (s, e) => { miScopeAll.Checked = settings.IndexAllDrives; miScopeFolder.Checked = !settings.IndexAllDrives; };
         }
 
         Control Space(int w) { return new Panel { Width = w, Height = 1, Margin = new Padding(0) }; }

@@ -8,7 +8,7 @@ namespace SwiftFind
     static class Program
     {
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
             // One failure must never take the whole app (and unsaved state) down silently.
             Application.ThreadException += (s, e) => ReportCrash("UI thread", e.Exception);
@@ -17,9 +17,17 @@ namespace SwiftFind
 
             string id = Environment.UserName;
             bool created;
+            bool waitForPrevious = Array.IndexOf(args, "--wait-for-previous") >= 0;
             using (var mutex = new Mutex(true, "SwiftFind.SingleInstance." + id, out created))
             using (var showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "SwiftFind.Show." + id))
             {
+                if (!created && waitForPrevious)
+                {
+                    // Restarted by the previous instance (e.g. elevated): wait for it to finish closing.
+                    try { created = mutex.WaitOne(10000); }
+                    catch (AbandonedMutexException) { created = true; } // previous process ended without releasing: we own it now
+                }
+
                 if (!created)
                 {
                     // Already running: ask that instance to come to the front instead of showing an error.

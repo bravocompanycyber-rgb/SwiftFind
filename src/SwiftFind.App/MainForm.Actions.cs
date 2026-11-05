@@ -168,7 +168,7 @@ namespace SwiftFind
         {
             if (!Clipboard.ContainsFileDropList()) return;
             var sel = SelectedEntries();
-            string destDir = settings.RootPath;
+            string destDir = IndexScope.DefaultFolder(settings);
             if (sel.Count > 0) destDir = sel[0].IsDirectory ? sel[0].FullPath : sel[0].Directory;
 
             bool move = false;
