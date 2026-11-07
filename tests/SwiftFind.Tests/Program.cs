@@ -139,6 +139,68 @@ static class Program
         Check("filter: unrelated", !pf.IsFolderExcluded(@"C:\Users"));
         Check("filter: extension", pf.IsExtensionExcluded(".TMP") && !pf.IsExtensionExcluded(".pdf"));
 
+        // adaptive scan threads: SSDs get many, spinning disks few, low-RAM PCs fewer still
+        const long GB = 1024L * 1024 * 1024;
+        Check("tune: SSD uses many threads", IndexTuning.ScanThreads(DriveKind.Ssd, false, "Auto", 16, 16 * GB) == 16);
+        Check("tune: SSD capped at 16", IndexTuning.ScanThreads(DriveKind.Ssd, false, "Auto", 64, 64 * GB) == 16);
+        Check("tune: HDD stays at 2 (parallel reads thrash the head)", IndexTuning.ScanThreads(DriveKind.Hdd, false, "Auto", 16, 16 * GB) == 2);
+        Check("tune: external HDD at 2", IndexTuning.ScanThreads(DriveKind.Hdd, true, "Auto", 8, 8 * GB) == 2);
+        Check("tune: unknown external (USB stick) is conservative", IndexTuning.ScanThreads(DriveKind.Unknown, true, "Auto", 16, 16 * GB) == 3);
+        Check("tune: network", IndexTuning.ScanThreads(DriveKind.Network, false, "Auto", 8, 8 * GB) == 4);
+        Check("tune: gentle uses a quarter of the cores", IndexTuning.ScanThreads(DriveKind.Ssd, false, "Gentle", 16, 16 * GB) == 4);
+        Check("tune: gentle never below 1", IndexTuning.ScanThreads(DriveKind.Ssd, false, "Gentle", 2, 8 * GB) == 1);
+        Check("tune: fast still limits HDD", IndexTuning.ScanThreads(DriveKind.Hdd, false, "Fast", 32, 32 * GB) == 3);
+        Check("tune: 3 GB RAM caps at 2", IndexTuning.ScanThreads(DriveKind.Ssd, false, "Auto", 16, 3 * GB) == 2);
+        Check("tune: 1 GB RAM runs single-threaded", IndexTuning.ScanThreads(DriveKind.Ssd, false, "Auto", 16, 1 * GB) == 1);
+        Check("tune: old 'Balanced' setting behaves as Auto", IndexTuning.ScanThreads(DriveKind.Ssd, false, "Balanced", 8, 16 * GB) == 8);
+        Check("tune: slowest of mixed drives is the HDD", IndexTuning.Slowest(new[] { DriveKind.Ssd, DriveKind.Hdd, DriveKind.Unknown }) == DriveKind.Hdd);
+
+        // parallel walker: completeness, no deadlock, cancellation, resilience (synthetic tree, 1/2/4/16 threads)
+        var tree = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        int expectedEntries = 0;
+        Action<string, int> build = null;
+        build = (path, depth) =>
+        {
+            var kids = new List<string>();
+            for (int f = 0; f < 3; f++) { kids.Add(path + @"\file" + f + ".txt"); expectedEntries++; }
+            if (depth < 5)
+                for (int d = 0; d < 5; d++) { string sub = path + @"\d" + d; kids.Add(sub); expectedEntries++; build(sub, depth + 1); }
+            tree[path] = kids.ToArray();
+        };
+        build(@"X:", 0);
+        Action<string, List<FileEntry>, List<string>> fakeList = (dir, local, subs) =>
+        {
+            string[] kids;
+            if (!tree.TryGetValue(dir, out kids)) return;
+            foreach (string k in kids)
+            {
+                bool isDir = tree.ContainsKey(k);
+                local.Add(new FileEntry { FullPath = k, Name = k.Substring(k.LastIndexOf('\\') + 1), Directory = dir, IsDirectory = isDir });
+                if (isDir) subs.Add(k);
+            }
+        };
+        foreach (int th in new[] { 1, 2, 4, 16 })
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var walked = ParallelWalker.Run(@"X:", th, false, fakeList, null);
+            Check("walker(" + th + "): finds every entry exactly once", walked != null && walked.Count == expectedEntries && walked.Select(x => x.FullPath).Distinct(StringComparer.OrdinalIgnoreCase).Count() == expectedEntries,
+                  walked == null ? "null" : walked.Count + " vs " + expectedEntries);
+            Check("walker(" + th + "): finishes promptly (no deadlock)", sw.ElapsedMilliseconds < 10000);
+        }
+        var cancelAt = 0;
+        var walkCancelled = ParallelWalker.Run(@"X:", 4, false, (d, l, s2) => { fakeList(d, l, s2); System.Threading.Interlocked.Increment(ref cancelAt); }, () => cancelAt > 20);
+        Check("walker: cancellation returns null", walkCancelled == null);
+        Action<string, List<FileEntry>, List<string>> flakyList = (d, l, s2) => { if (d.EndsWith(@"\d2")) throw new System.IO.IOException("access denied"); fakeList(d, l, s2); };
+        var flaky1 = ParallelWalker.Run(@"X:", 1, false, flakyList, null);
+        var flaky8 = ParallelWalker.Run(@"X:", 8, false, flakyList, null);
+        Check("walker: an unreadable folder is skipped, the rest is still scanned", flaky1.Count > 0 && flaky1.Count < expectedEntries);
+        Check("walker: same result with 1 or 8 threads", flaky1.Count == flaky8.Count);
+        bool fellBack = false;
+        try { ParallelWalker.Run(@"X:", 4, false, (d, l, s2) => { throw new DllNotFoundException("kernel32"); }, null); }
+        catch (DllNotFoundException) { fellBack = true; }
+        Check("walker: missing native API is reported so the caller can fall back", fellBack);
+        Check("walker: empty tree is fine", ParallelWalker.Run(@"Z:", 8, false, (d, l, s2) => { }, null).Count == 0);
+
         // folder-NAME rules (e.g. node_modules) match at any depth, with exact segment boundaries
         var nf = new PathFilter(new[] { "node_modules", "$Recycle.Bin" }, null);
         Check("name rule: nested", nf.IsFolderExcluded(@"C:\proj\app\node_modules"));

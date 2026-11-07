@@ -36,6 +36,7 @@ namespace SwiftFind
                 Item("Open", Keys.Enter, (s, e) => OpenSelected()),
                 miOpenWith,
                 Item("Show in folder", Keys.Control | Keys.Enter, (s, e) => RevealSelected()),
+                Item("Open terminal here", Keys.None, (s, e) => OpenTerminalHere()),
                 new ToolStripSeparator(),
                 Item("Copy", Keys.Control | Keys.C, (s, e) => ClipboardFiles(false)),
                 Item("Cut", Keys.Control | Keys.X, (s, e) => ClipboardFiles(true)),
@@ -123,6 +124,20 @@ namespace SwiftFind
                 else Process.Start(new ProcessStartInfo("explorer.exe", "/select,\"" + path + "\"") { UseShellExecute = true });
             }
             catch (Exception ex) { Log.Error("Reveal", ex); }
+        }
+
+        void OpenTerminalHere()
+        {
+            var sel = SelectedEntries();
+            if (sel.Count == 0) return;
+            string dir = sel[0].IsDirectory ? sel[0].FullPath : sel[0].Directory;
+            if (!Directory.Exists(dir)) { EnsureExists(sel[0]); return; }
+            try { Process.Start(new ProcessStartInfo("wt.exe", "-d \"" + dir + "\"") { UseShellExecute = true }); }       // Windows Terminal if installed
+            catch (Exception)
+            {
+                try { Process.Start(new ProcessStartInfo("cmd.exe") { WorkingDirectory = dir, UseShellExecute = true }); }
+                catch (Exception ex) { Log.Error("Open terminal", ex); }
+            }
         }
 
         void ShowProperties()

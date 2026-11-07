@@ -12,6 +12,25 @@ A ground-up quality pass: new design, new brand assets, many correctness fixes.
 - Window size, position, maximised state and sort order are remembered
 - Per-monitor high-DPI support (manifest + DPI-aware layout)
 
+### Fast on external and non-NTFS drives
+- New native scanner for **FAT, FAT32, exFAT, ReFS, network shares and NTFS without administrator rights**: large-batch `FindFirstFileEx`, no per-file object allocation, several threads walking folders at once
+- Each drive is classified (SSD / spinning HDD / USB or other external / network) via a query that needs no administrator rights; the thread count is chosen to suit it — many threads for SSDs, few for HDDs and USB bridges (parallel reads make a spinning disk *slower*)
+- Also adapts to the PC: CPU core count and installed RAM (low-memory machines get fewer threads); *Gentle* and *Fast* remain as overrides, *Auto* is the default
+- The size/date pass after a fast NTFS index is tuned to the slowest drive involved
+- Preferences shows, per drive, what kind it is and how it will be indexed; About shows PC specs and the thread count each drive gets
+- If the native API is ever unavailable the app falls back to the managed scanner automatically
+
+### More features
+- **Quick views** (View menu): largest files, changed in the last 7 days / today, folders only
+- **Duplicate finder**: lists files that share name and size
+- **Open terminal here** in the context menu
+- Dialogs now scale with the display, and Preferences fits small laptop screens
+
+### Audit fixes
+- A folder on a network share (`\\server\share`), CD-ROM or RAM disk was mistaken for a "disconnected drive" and purged from the index
+- Favourites were read by the search thread while the UI could modify them; the search now works on its own copy
+- *Export settings* applied unconfirmed changes to disk; it now exports what is saved
+
 ### Drives that come and go
 - **Fixed:** the index kept listing a drive after it was removed, so searches showed files that weren't there until you rebuilt. SwiftFind now watches for plug/unplug events (plus a background check) and removes a drive's files the moment it disappears
 - Each drive is tracked with its volume serial number, so a *different* disk that gets the same drive letter is detected and re-indexed instead of showing the old disk's files
@@ -73,7 +92,7 @@ A ground-up quality pass: new design, new brand assets, many correctness fixes.
 - **Removed from git:** build output (`obj/`), compiled binaries and the `backups/` folder (still in history); added `.gitignore`
 - Builds now go to `bin/Release/net48` instead of the repository root
 - CI: restore-safe `dotnet build`, unit tests, version from tag, SHA-256 checksum. The icon is no longer regenerated (and overwritten) on every build
-- Unit tests for the search engine, exclusion rules and the index cache (60 cases)
+- Unit tests for the search engine, exclusion rules and the index cache (86 cases, including a multi-threaded walker test)
 
 ## 2.7.0 and earlier
 See git history.

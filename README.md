@@ -9,6 +9,7 @@ SwiftFind indexes **everything on your PC** — every local drive (and USB drive
 
 ## Features
 
+- **Fast on every kind of drive** — NTFS drives (internal or external) use the MFT fast index with administrator rights; everything else (FAT, FAT32, exFAT, ReFS, network shares, NTFS without admin) uses a native multi-threaded scanner. SwiftFind detects whether each drive is an SSD, a spinning HDD or a USB device and picks the thread count to match, taking your CPU cores and RAM into account
 - **Knows when drives come and go** — unplug a USB drive and its files vanish from the results at once; plug one in (or swap the disk behind a drive letter) and only that drive is indexed, no full rebuild
 - **Never freezes** — drive probing, indexing, loading and saving all run in the background at reduced priority
 - **Search everywhere by default** — all drives indexed automatically on first run, kept fresh in the background
@@ -16,6 +17,7 @@ SwiftFind indexes **everything on your PC** — every local drive (and USB drive
 - **NTFS fast index** (MFT / USN) with automatic fallback to a folder scan
 - **Powerful query syntax** — wildcards, regex, size, date, extension, path, exclusions (see below)
 - **File actions** — open, open with, show in folder, copy / cut / paste, rename, **move to Recycle Bin**, properties, drag files out to other apps
+- **Quick views** — largest files, changed today / this week, folders only, and a **duplicate finder** (same name and size)
 - **Favourites**, grouping (type, folder, date, size), colour coding, sortable columns
 - **Export results to CSV**
 - **Dark, modern UI** with brand icon, per-type shell icons, per-monitor high-DPI support
@@ -37,7 +39,7 @@ Grab `SwiftFind-portable-windows.zip` (or `SwiftFind.exe`) from the [Releases](.
 | Page | What you can change |
 |---|---|
 | Drives & scope | everywhere vs one folder; include USB / network drives; tick individual drives to leave out; live drive list |
-| Indexing | indexing effort (Gentle / Balanced / Fast), background refresh interval, rebuild at startup, show hidden & system files, restart as administrator |
+| Indexing | indexing effort (Gentle / Auto / Fast; Auto adapts to the PC and each drive), background refresh interval, rebuild at startup, show hidden & system files, restart as administrator |
 | Search & results | result limit, typing delay, grouping, double-click action, date format, folders first, colour coding, full-path matching, confirm before delete |
 | Appearance | Dark / Light / follow Windows, text size (Small to Extra large) |
 | Startup & tray | start with Windows, start hidden, keep running in the tray, global hotkey (5 presets), clear search on hotkey |
@@ -78,6 +80,7 @@ Combine freely: `budget ext:xlsx dm:month !old`
 | `Alt+Enter` | properties |
 | `Ctrl+E` | export results to CSV |
 | `F1` | search syntax help |
+| context menu → *Open terminal here* | Windows Terminal (or Command Prompt) in that folder |
 | `Ctrl+Alt+Space` | global hotkey: bring SwiftFind to the front (can be turned off in Preferences) |
 
 ## Where data lives
@@ -110,7 +113,7 @@ src/SwiftFind.App/       the application
   Core/                  paths, logging, Win32 helpers, theme
   Controls/              flat button, search box
   Forms/                 preferences, dialogs
-  Indexing/              USN (MFT) indexer, recursive indexer, details enricher
+  Indexing/              USN (MFT) indexer, native parallel scanner, thread tuning, details enricher
   Search/                query parser + matcher (UI-free, unit-tested)
   Services/              index cache, file operations, icon cache
 tests/SwiftFind.Tests/   dependency-free unit tests

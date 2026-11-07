@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using SwiftFind.Core;
 using SwiftFind.Forms;
+using SwiftFind.Indexing;
 using SwiftFind.Models;
 using SwiftFind.Search;
 using SwiftFind.Services;
@@ -33,6 +34,69 @@ namespace SwiftFind
             { "Code", new[] { ".cs", ".js", ".ts", ".py", ".java", ".cpp", ".c", ".h", ".php", ".html", ".css", ".json", ".xml", ".sql", ".go", ".rs", ".dart", ".kt", ".swift", ".sh", ".ps1" } },
             { "Executables", new[] { ".exe", ".msi", ".bat", ".cmd", ".dll", ".apk" } }
         };
+
+        bool duplicatesOnly;
+        HashSet<FileEntry> dupSet;
+
+        // ================================================================ quick views
+
+        /// <summary>Pre-sets the search box and sort order for a common question ("what's eating my disk?").</summary>
+        void QuickView(string query, int column, bool ascending)
+        {
+            duplicatesOnly = false; dupSet = null;
+            sortColumn = column; sortAscending = ascending;
+            UpdateHeaders();
+            ApplyMenuState();
+            if (searchBox.Input.Text == query) ApplySearch(); else searchBox.Input.Text = query;   // changing the text searches by itself
+            searchBox.Input.Focus();
+        }
+
+        /// <summary>Lists files that share both name and size (a cheap, reliable duplicate signal).</summary>
+        void ToggleDuplicates()
+        {
+            if (duplicatesOnly)
+            {
+                duplicatesOnly = false; dupSet = null;
+                ApplyMenuState();
+                ApplySearch();
+                return;
+            }
+            FileEntry[] snapshot = index;
+            if (snapshot.Length == 0) { SetStatus("Build the index first."); return; }
+            SetStatus("Looking for duplicate files\u2026", true);
+
+            Task.Factory.StartNew(() =>
+            {
+                FileEntry[] files = snapshot.Where(f => !f.IsDirectory && f.Size > 0).ToArray();
+                Array.Sort(files, (a, b) =>
+                {
+                    int c = a.Size.CompareTo(b.Size);
+                    return c != 0 ? c : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+                });
+                var set = new HashSet<FileEntry>();
+                int groups = 0, i = 0;
+                while (i < files.Length)
+                {
+                    int j = i + 1;
+                    while (j < files.Length && files[j].Size == files[i].Size &&
+                           string.Equals(files[j].Name, files[i].Name, StringComparison.OrdinalIgnoreCase)) j++;
+                    if (j - i > 1) { groups++; for (int k = i; k < j; k++) set.Add(files[k]); }
+                    i = j;
+                }
+                return new KeyValuePair<HashSet<FileEntry>, int>(set, groups);
+            }).ContinueWith(t =>
+            {
+                if (IsDisposed) return;
+                if (t.IsFaulted) { Log.Error("Duplicates", t.Exception); SetStatus("Could not look for duplicates."); return; }
+                dupSet = t.Result.Key;
+                duplicatesOnly = true;
+                sortColumn = 0; sortAscending = true; UpdateHeaders();
+                ApplyMenuState();
+                ApplySearch();
+                SetStatus(dupSet.Count == 0 ? "No duplicates found (same name and size)."
+                    : dupSet.Count.ToString("N0") + " files in " + t.Result.Value.ToString("N0") + " duplicate groups (same name and size). Choose View \u2192 Duplicate files again to leave this view.");
+            }, TaskScheduler.FromCurrentSynchronizationContext());
+        }
 
         // ================================================================ search
 
@@ -73,7 +137,11 @@ namespace SwiftFind
                 }
             }
 
-            if (favoritesOnly) q.Extra = f => favorites.Contains(f.FullPath);
+            // The search runs on another thread, so give it its own copies instead of the live collections.
+            HashSet<string> favSnap = favoritesOnly ? new HashSet<string>(favorites, StringComparer.OrdinalIgnoreCase) : null;
+            HashSet<FileEntry> dups = duplicatesOnly ? dupSet : null;
+            if (favSnap != null || dups != null)
+                q.Extra = f => (favSnap == null || favSnap.Contains(f.FullPath)) && (dups == null || dups.Contains(f));
             return q;
         }
 
@@ -402,6 +470,10 @@ namespace SwiftFind
             var sb = new StringBuilder();
             sb.AppendLine("Index:  " + index.Length.ToString("N0") + " items (" + (indexMethod == "usn" ? "NTFS fast index" : indexMethod) + ")");
             sb.AppendLine("Scope:  " + IndexScope.Describe(settings));
+            long ram = Native.TotalRamBytes();
+            sb.AppendLine("PC:     " + Environment.ProcessorCount + " CPU threads" + (ram > 0 ? ", " + (ram / (1024.0 * 1024 * 1024)).ToString("0.#") + " GB RAM" : "") + "  (indexing effort: " + settings.IndexPriority + ")");
+            foreach (var d in IndexScope.Drives(settings))
+                sb.AppendLine("  " + d.Root.TrimEnd('\\') + "  " + d.KindText + ", " + d.Format + "  \u2192 " + IndexTuning.ScanThreads(d.Kind, d.IsExternal, settings.IndexPriority, Environment.ProcessorCount, ram) + " scan threads");
             sb.AppendLine("Data:   " + AppPaths.DataDir + (AppPaths.IsPortable ? "  (portable mode)" : ""));
             sb.AppendLine("Admin:  " + (IsAdministrator() ? "yes - NTFS fast indexing available" : "no - run as administrator for fast NTFS indexing"));
             sb.AppendLine();

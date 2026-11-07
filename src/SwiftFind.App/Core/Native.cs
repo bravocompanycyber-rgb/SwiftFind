@@ -57,6 +57,81 @@ namespace SwiftFind.Core
         static extern bool GetVolumeInformation(string root, System.Text.StringBuilder volName, int volNameSize,
             out uint serial, out uint maxComponent, out uint flags, System.Text.StringBuilder fsName, int fsNameSize);
 
+        [DllImport("kernel32.dll", EntryPoint = "CreateFileW", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern IntPtr CreateFileRaw(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+
+        [DllImport("kernel32.dll", EntryPoint = "DeviceIoControl", SetLastError = true)]
+        static extern bool DeviceIoControlBytes(IntPtr device, uint code, byte[] input, int inputSize, byte[] output, int outputSize, out int returned, IntPtr overlapped);
+
+        [DllImport("kernel32.dll")]
+        static extern bool CloseHandle(IntPtr handle);
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct MEMORYSTATUSEX
+        {
+            public uint dwLength, dwMemoryLoad;
+            public ulong ullTotalPhys, ullAvailPhys, ullTotalPageFile, ullAvailPageFile, ullTotalVirtual, ullAvailVirtual, ullAvailExtendedVirtual;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX status);
+
+        /// <summary>Installed RAM in bytes (0 when unknown).</summary>
+        public static long TotalRamBytes()
+        {
+            try
+            {
+                var m = new MEMORYSTATUSEX { dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX)) };
+                return GlobalMemoryStatusEx(ref m) ? (long)m.ullTotalPhys : 0;
+            }
+            catch { return 0; }
+        }
+
+        static IntPtr OpenVolumeForQuery(string root)
+        {
+            // Access 0 = query only, so no administrator rights are needed.
+            IntPtr h = CreateFileRaw(@"\\.\" + root.TrimEnd('\\'), 0, 3, IntPtr.Zero, 3, 0, IntPtr.Zero);
+            return (h == new IntPtr(-1) || h == IntPtr.Zero) ? IntPtr.Zero : h;
+        }
+
+        /// <summary>1 = spinning disk (seek penalty), 0 = SSD / flash, -1 = unknown.</summary>
+        public static int QuerySeekPenalty(string root)
+        {
+            IntPtr h = IntPtr.Zero;
+            try
+            {
+                h = OpenVolumeForQuery(root);
+                if (h == IntPtr.Zero) return -1;
+                var query = new byte[12];
+                BitConverter.GetBytes(7).CopyTo(query, 0);   // StorageDeviceSeekPenaltyProperty
+                BitConverter.GetBytes(0).CopyTo(query, 4);   // PropertyStandardQuery
+                var output = new byte[16];
+                int returned;
+                if (!DeviceIoControlBytes(h, 0x002D1400, query, query.Length, output, output.Length, out returned, IntPtr.Zero) || returned < 9) return -1;
+                return output[8] != 0 ? 1 : 0;
+            }
+            catch { return -1; }
+            finally { if (h != IntPtr.Zero) CloseHandle(h); }
+        }
+
+        /// <summary>Storage bus type (7 = USB, 11 = SATA, 17 = NVMe ...), or 0 if unknown.</summary>
+        public static int QueryBusType(string root)
+        {
+            IntPtr h = IntPtr.Zero;
+            try
+            {
+                h = OpenVolumeForQuery(root);
+                if (h == IntPtr.Zero) return 0;
+                var query = new byte[12];                      // PropertyId 0 = StorageDeviceProperty
+                var output = new byte[1024];
+                int returned;
+                if (!DeviceIoControlBytes(h, 0x002D1400, query, query.Length, output, output.Length, out returned, IntPtr.Zero) || returned < 32) return 0;
+                return BitConverter.ToInt32(output, 28);
+            }
+            catch { return 0; }
+            finally { if (h != IntPtr.Zero) CloseHandle(h); }
+        }
+
         public const int WM_DEVICECHANGE = 0x0219;
         public const int DBT_DEVNODES_CHANGED = 0x0007, DBT_DEVICEARRIVAL = 0x8000, DBT_DEVICEREMOVECOMPLETE = 0x8004;
 

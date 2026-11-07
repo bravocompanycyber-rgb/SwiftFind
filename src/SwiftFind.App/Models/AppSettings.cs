@@ -33,7 +33,7 @@ namespace SwiftFind.Models
         public int SearchDelayMs = 90;
         public int HotkeyPreset = 0;
         public bool ClearSearchOnHotkey = false;
-        public string IndexPriority = "Balanced";     // Gentle | Balanced | Fast
+        public string IndexPriority = "Auto";         // Gentle | Auto | Fast
         public int AutoRefreshHours = 6;              // 0 = never
         public bool IncludeNetwork = false;
         public List<string> ExcludedDrives = new List<string>();
@@ -83,7 +83,7 @@ namespace SwiftFind.Models
                         case "searchdelay": s.SearchDelayMs = Clamp(ParseInt(val, 90), 0, 1000); break;
                         case "hotkeypreset": s.HotkeyPreset = Clamp(ParseInt(val, 0), 0, 4); break;
                         case "clearonhotkey": s.ClearSearchOnHotkey = ParseBool(val, false); break;
-                        case "priority": if (val == "Gentle" || val == "Balanced" || val == "Fast") s.IndexPriority = val; break;
+                        case "priority": s.IndexPriority = (val == "Gentle" || val == "Fast") ? val : "Auto"; break;
                         case "autorefreshhours": s.AutoRefreshHours = Clamp(ParseInt(val, 6), 0, 168); break;
                         case "includenetwork": s.IncludeNetwork = ParseBool(val, false); break;
                         case "excludeddrive": if (!string.IsNullOrWhiteSpace(val)) s.ExcludedDrives.Add(val); break;

@@ -47,7 +47,7 @@ namespace SwiftFind.Forms
         ListBox lstFolders;
         TextBox txtExtensions;
 
-        static readonly string[] PriorityValues = { "Gentle", "Balanced", "Fast" };
+        static readonly string[] PriorityValues = { "Gentle", "Auto", "Fast" };
         static readonly string[] ThemeValues = { "Dark", "Light", "System" };
         static readonly int[] TextSizes = { 90, 100, 115, 130 };
         static readonly string[] DateValues = { "Iso", "System", "Relative" };
@@ -146,7 +146,11 @@ namespace SwiftFind.Forms
             StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = MaximizeBox = false;
             ShowInTaskbar = false;
-            ClientSize = new Size(860, 660);
+            // Fit small laptop screens at any display scaling (the window scales up from these design units).
+            float scale = 1f;
+            try { using (Graphics g = Graphics.FromHwnd(IntPtr.Zero)) scale = Math.Max(1f, g.DpiY / 96f); } catch { }
+            int room = (int)(Screen.PrimaryScreen.WorkingArea.Height / scale) - 90;
+            ClientSize = new Size(860, Math.Max(480, Math.Min(660, room)));
 
             BuildScopePage();
             BuildIndexingPage();
@@ -202,7 +206,7 @@ namespace SwiftFind.Forms
             p.Gap(8);
             p.Caption("Connected drives \u2014 untick any drive you never want searched");
             lvDrives = new ListView { View = View.Details, CheckBoxes = true, FullRowSelect = true, HideSelection = false, Width = PageWidth, BorderStyle = BorderStyle.FixedSingle, BackColor = Theme.Surface, ForeColor = Theme.Text };
-            lvDrives.Columns.Add("Drive", 150); lvDrives.Columns.Add("Type", 100); lvDrives.Columns.Add("File system", 90); lvDrives.Columns.Add("Indexing", 215);
+            lvDrives.Columns.Add("Drive", 130); lvDrives.Columns.Add("Kind", 120); lvDrives.Columns.Add("Format", 62); lvDrives.Columns.Add("How it is indexed", 245);
             if (Theme.IsDark) Native.UseDarkControlTheme(lvDrives);
             p.Add(lvDrives, 170);
             var refresh = new FlatButton("Refresh drive list") { Width = 160, Height = 30 };
@@ -220,7 +224,8 @@ namespace SwiftFind.Forms
         {
             var p = NewPage("Indexing");
             p.Heading("Indexing");
-            cmbPriority = p.Combo("How hard should indexing work?", new[] { "Gentle \u2014 lowest impact, keeps your PC smooth", "Balanced (recommended)", "Fast \u2014 use every CPU core" }, 380);
+            cmbPriority = p.Combo("How hard should indexing work?", new[] { "Gentle \u2014 lowest impact, keeps your PC smooth", "Auto \u2014 adapts to your PC and each drive (recommended)", "Fast \u2014 use as much of the PC as it can" }, 440);
+            p.Note("Solid-state drives are scanned with many threads at once; spinning disks and USB drives with few, because parallel reads slow them down.", 2);
             numRefresh = p.Number("Refresh the index in the background every (hours, 0 = never)", 0, 168, 1);
             p.Note("Applies to NTFS drives when SwiftFind runs as administrator, where a refresh takes seconds.", 1);
             p.Gap(6);
@@ -333,7 +338,7 @@ namespace SwiftFind.Forms
                 using (var d = new SaveFileDialog { Filter = "SwiftFind settings (*.ini)|*.ini", FileName = "SwiftFind-settings.ini" })
                 {
                     if (d.ShowDialog(this) != DialogResult.OK) return;
-                    try { Apply(); settings.Save(); File.Copy(AppPaths.SettingsFile, d.FileName, true); MessageBox.Show(this, "Settings exported.", "Preferences"); }
+                    try { if (!File.Exists(AppPaths.SettingsFile)) settings.Save(); File.Copy(AppPaths.SettingsFile, d.FileName, true); MessageBox.Show(this, "Your saved settings were exported.", "Preferences"); }
                     catch (Exception ex) { Log.Error("Export settings", ex); MessageBox.Show(this, ex.Message, "Export failed", MessageBoxButtons.OK, MessageBoxIcon.Error); }
                 }
             };
@@ -403,9 +408,11 @@ namespace SwiftFind.Forms
             foreach (DriveDetails d in DriveMonitor.Shared.Drives)
             {
                 shown.Add(d.Root);
-                string how = d.IsNtfs ? "NTFS fast index (administrator)" : "Folder scan";
+                int threads = SwiftFind.Indexing.IndexTuning.ScanThreads(d.Kind, d.IsExternal, settings.IndexPriority, Environment.ProcessorCount, Native.TotalRamBytes());
+                string fast = "fast scan, " + threads + (threads == 1 ? " thread" : " threads");
+                string how = d.IsNtfs ? (IsAdmin() ? "NTFS fast index" : "NTFS index (admin) or " + fast) : fast;
                 var item = new ListViewItem(d.Display) { Tag = d.Root, Checked = !excluded.Contains(d.Root) };
-                item.SubItems.Add(d.TypeText); item.SubItems.Add(string.IsNullOrEmpty(d.Format) ? "?" : d.Format); item.SubItems.Add(how);
+                item.SubItems.Add(d.KindText); item.SubItems.Add(string.IsNullOrEmpty(d.Format) ? "?" : d.Format); item.SubItems.Add(how);
                 lvDrives.Items.Add(item);
             }
             foreach (string root in excluded.Where(r => !shown.Contains(r)))

@@ -13,18 +13,7 @@ namespace SwiftFind.Indexing
     /// </summary>
     public static class DetailsEnricher
     {
-        public static int DegreeFor(string priority)
-        {
-            int cores = Math.Max(1, Environment.ProcessorCount);
-            switch (priority)
-            {
-                case "Gentle": return Math.Max(1, cores / 4);
-                case "Fast": return cores;
-                default: return Math.Max(2, cores / 2);
-            }
-        }
-
-        public static void Run(IList<FileEntry> entries, Action<int, int> progress, CancellationToken token, string priority = "Balanced")
+        public static void Run(IList<FileEntry> entries, Action<int, int> progress, CancellationToken token, int degree, bool lowPriority)
         {
             var pending = new List<FileEntry>();
             foreach (var f in entries)
@@ -33,8 +22,8 @@ namespace SwiftFind.Indexing
             if (pending.Count == 0) return;
 
             int done = 0, total = pending.Count;
-            bool low = priority != "Fast";
-            var options = new ParallelOptions { CancellationToken = token, MaxDegreeOfParallelism = DegreeFor(priority) };
+            bool low = lowPriority;
+            var options = new ParallelOptions { CancellationToken = token, MaxDegreeOfParallelism = Math.Max(1, degree) };
 
             Parallel.ForEach(System.Collections.Concurrent.Partitioner.Create(0, total, 2048), options, range =>
             {

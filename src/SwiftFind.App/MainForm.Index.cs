@@ -222,6 +222,9 @@ namespace SwiftFind
             FileEntry[] before = index;
             var serials = targets.ToDictionary(r => r, r => IndexScope.SerialOf(r), StringComparer.OrdinalIgnoreCase);
             bool lowPriority = settings.IndexPriority != "Fast";
+            string priority = settings.IndexPriority;
+            int cores = Environment.ProcessorCount;
+            long ram = Native.TotalRamBytes();
             int baseCount = 0;
             Action<int> progress = n =>
             {
@@ -244,7 +247,9 @@ namespace SwiftFind
                     {
                         string root = targets[i];
                         if (cancelled()) return null;
-                        string label = "Indexing " + root.TrimEnd('\\') + (targets.Count > 1 ? "  (" + (i + 1) + " of " + targets.Count + ")" : "") + "\u2026";
+                        DriveDetails drive = IndexScope.DriveFor(root);
+                        int threads = IndexTuning.ScanThreads(drive != null ? drive.Kind : DriveKind.Unknown, drive != null && drive.IsExternal, priority, cores, ram);
+                        string label = "Indexing " + root.TrimEnd('\\') + (drive != null ? " (" + drive.KindText + ")" : "") + (targets.Count > 1 ? "  " + (i + 1) + " of " + targets.Count : "") + "\u2026";
                         try { BeginInvoke((Action)(() => { if (indexing) SetStatus(label, true); })); } catch { }
 
                         List<FileEntry> part = null;
@@ -257,7 +262,7 @@ namespace SwiftFind
                         if (cancelled()) return null;
                         if (part == null)
                         {
-                            part = RecursiveIndexer.Index(root, filter, progress, cancelled);
+                            part = FastScanner.Index(root, filter, threads, lowPriority, progress, cancelled);
                             if (part == null) return null;
                             scanCount++;
                         }
@@ -329,6 +334,10 @@ namespace SwiftFind
             enriching = true;
             var cts = enrichCts = new CancellationTokenSource();
             string priority = settings.IndexPriority;
+            var kinds = indexedRoots.Keys.Select(r => IndexScope.DriveFor(r)).Where(d => d != null).ToList();
+            DriveKind slowest = IndexTuning.Slowest(kinds.Select(d => d.Kind));
+            int degree = IndexTuning.EnrichThreads(slowest, kinds.Any(d => d.IsExternal), priority, Environment.ProcessorCount, Native.TotalRamBytes());
+            bool lowPriority = priority != "Fast";
 
             Task.Factory.StartNew(() =>
             {
@@ -336,7 +345,7 @@ namespace SwiftFind
                 {
                     int pct = (int)(done * 100L / Math.Max(1, total));
                     try { BeginInvoke((Action)(() => { if (enriching) SetStatus("Reading file sizes and dates\u2026 " + pct + "%", true); })); } catch { }
-                }, cts.Token, priority);
+                }, cts.Token, degree, lowPriority);
             }, cts.Token).ContinueWith(t =>
             {
                 enriching = false;

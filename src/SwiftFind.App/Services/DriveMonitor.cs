@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SwiftFind.Core;
+using SwiftFind.Indexing;
 
 namespace SwiftFind.Services
 {
@@ -16,6 +17,8 @@ namespace SwiftFind.Services
         public string Label;
         public uint Serial;          // volume serial number (0 = unknown)
         public long TotalBytes;
+        public DriveKind Kind;       // SSD / HDD / network ...
+        public bool IsExternal;      // USB, FireWire, SD card or other removable bus
 
         public bool IsNtfs { get { return string.Equals(Format, "NTFS", StringComparison.OrdinalIgnoreCase); } }
         public string TypeText
@@ -32,6 +35,15 @@ namespace SwiftFind.Services
                 }
             }
         }
+        public string KindText
+        {
+            get
+            {
+                string k = Kind == DriveKind.Ssd ? "SSD" : Kind == DriveKind.Hdd ? "HDD" : Kind == DriveKind.Network ? "network drive" : Kind == DriveKind.Optical ? "optical" : "drive";
+                return IsExternal ? "external " + k : k;
+            }
+        }
+
         public string Display
         {
             get { return Root.TrimEnd('\\') + (string.IsNullOrEmpty(Label) ? "" : " " + Label); }
@@ -108,7 +120,7 @@ namespace SwiftFind.Services
             {
                 DriveType type;
                 try { type = d.DriveType; } catch { continue; }
-                if (type != DriveType.Fixed && type != DriveType.Removable && type != DriveType.Network) continue;
+                if (type == DriveType.NoRootDirectory || type == DriveType.Unknown) continue;   // CD-ROM and RAM disks are tracked too, so a folder on one isn't mistaken for 'disconnected'
 
                 DriveDetails details = null;
                 var probe = Task.Factory.StartNew(() =>
@@ -116,15 +128,26 @@ namespace SwiftFind.Services
                     try
                     {
                         if (!d.IsReady) return (DriveDetails)null;
-                        return new DriveDetails
+                        string root = d.RootDirectory.FullName;
+                        var dd = new DriveDetails
                         {
-                            Root = d.RootDirectory.FullName,
+                            Root = root,
                             Type = type,
                             Format = d.DriveFormat,
                             Label = d.VolumeLabel,
                             TotalBytes = d.TotalSize,
-                            Serial = Native.GetVolumeSerial(d.RootDirectory.FullName)
+                            Serial = Native.GetVolumeSerial(root)
                         };
+                        if (type == DriveType.Network) dd.Kind = DriveKind.Network;
+                        else if (type == DriveType.CDRom) dd.Kind = DriveKind.Optical;
+                        else if (type != DriveType.Ram)
+                        {
+                            int seek = Native.QuerySeekPenalty(root);      // spinning disk or flash?
+                            int bus = Native.QueryBusType(root);           // 7 = USB, 17 = NVMe ...
+                            dd.Kind = seek == 1 ? DriveKind.Hdd : (seek == 0 || bus == 17 ? DriveKind.Ssd : DriveKind.Unknown);
+                            dd.IsExternal = type == DriveType.Removable || bus == 4 || bus == 7 || bus == 12 || bus == 13;
+                        }
+                        return dd;
                     }
                     catch { return null; }
                 });

@@ -46,7 +46,7 @@ namespace SwiftFind
         ContextMenuStrip rowMenu;
         ToolStripMenuItem miFavorite, miRename, miPaste, miOpenWith;
         readonly Dictionary<string, ToolStripMenuItem> groupItems = new Dictionary<string, ToolStripMenuItem>();
-        ToolStripMenuItem miFoldersFirst, miColor, miMatchPath, miFavOnly, miHidden, miScopeAll, miScopeFolder, miAdmin;
+        ToolStripMenuItem miFoldersFirst, miColor, miMatchPath, miFavOnly, miHidden, miDuplicates, miScopeAll, miScopeFolder, miAdmin;
         ContextMenuStrip scopeMenu;
 
         static readonly string[] ColumnNames = { "Name", "Location", "Size", "Modified", "Type" };
@@ -164,8 +164,18 @@ namespace SwiftFind
             miColor = Item("Colour-code results", Keys.None, (s, e) => { settings.ColorCode = !settings.ColorCode; settings.Save(); ApplyMenuState(); ApplySearch(); });
             miMatchPath = Item("Match full path", Keys.None, (s, e) => { settings.MatchPath = !settings.MatchPath; settings.Save(); ApplyMenuState(); ApplySearch(); });
             miFavOnly = Item("Favourites only", Keys.Control | Keys.B, (s, e) => ToggleFavoritesView());
+            miDuplicates = Item("Duplicate files (same name and size)", Keys.None, (s, e) => ToggleDuplicates());
+            var quick = new ToolStripMenuItem("Quick views") { ForeColor = Theme.Text };
+            quick.DropDownItems.AddRange(new ToolStripItem[]
+            {
+                Item("Largest files", Keys.None, (s, e) => QuickView("file:", 2, false)),
+                Item("Changed in the last 7 days", Keys.None, (s, e) => QuickView("file: dm:week", 3, false)),
+                Item("Changed today", Keys.None, (s, e) => QuickView("file: dm:today", 3, false)),
+                Item("Folders only", Keys.None, (s, e) => QuickView("folder:", 0, true)),
+                Item("Everything (clear search)", Keys.None, (s, e) => QuickView("", 0, true))
+            });
             miHidden = Item("Show hidden and system items", Keys.None, (s, e) => { settings.ShowHidden = !settings.ShowHidden; settings.Save(); ApplyMenuState(); ApplySearch(); });
-            view.DropDownItems.AddRange(new ToolStripItem[] { group, new ToolStripSeparator(), miFoldersFirst, miColor, miMatchPath, miHidden, new ToolStripSeparator(), miFavOnly });
+            view.DropDownItems.AddRange(new ToolStripItem[] { quick, miDuplicates, new ToolStripSeparator(), group, new ToolStripSeparator(), miFoldersFirst, miColor, miMatchPath, miHidden, new ToolStripSeparator(), miFavOnly });
 
             var tools = new ToolStripMenuItem("Tools");
             tools.DropDownItems.AddRange(new ToolStripItem[]
@@ -195,6 +205,7 @@ namespace SwiftFind
             miColor.Checked = settings.ColorCode;
             miMatchPath.Checked = settings.MatchPath;
             miHidden.Checked = settings.ShowHidden;
+            miDuplicates.Checked = duplicatesOnly;
             miFavOnly.Checked = favoritesOnly;
         }
 

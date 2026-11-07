@@ -88,6 +88,8 @@ namespace SwiftFind.Core
         /// <summary>Applies the dark look to a dialog-style form.</summary>
         public static void StyleForm(Form f)
         {
+            f.AutoScaleDimensions = new SizeF(96F, 96F);   // dialogs scale with the display, like the main window
+            f.AutoScaleMode = AutoScaleMode.Dpi;
             f.BackColor = Bg;
             f.ForeColor = Text;
             f.Font = Ui();

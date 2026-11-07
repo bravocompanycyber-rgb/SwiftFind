@@ -39,8 +39,15 @@ namespace SwiftFind.Services
         /// <summary>True if the drive that holds <paramref name="root"/> is currently connected.</summary>
         public static bool IsOnline(string root)
         {
+            if (root != null && root.StartsWith(@"\\")) return true;   // UNC share (\\\\server\\share): can't be judged from the drive list
             string vol = System.IO.Path.GetPathRoot(root) ?? "";
             return DriveMonitor.Shared.Drives.Any(x => string.Equals(x.Root, vol, StringComparison.OrdinalIgnoreCase));
+        }
+
+        public static DriveDetails DriveFor(string root)
+        {
+            string vol = System.IO.Path.GetPathRoot(root) ?? "";
+            return DriveMonitor.Shared.Drives.FirstOrDefault(x => string.Equals(x.Root, vol, StringComparison.OrdinalIgnoreCase));
         }
 
         /// <summary>Identifies the kind of scope; drives coming and going do NOT change it, so the saved index stays valid.</summary>
