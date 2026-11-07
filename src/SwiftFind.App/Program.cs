@@ -7,6 +7,9 @@ namespace SwiftFind
 {
     static class Program
     {
+        /// <summary>True when launched with --minimized (e.g. by Start with Windows).</summary>
+        public static bool StartHidden;
+
         [STAThread]
         static void Main(string[] args)
         {
@@ -18,6 +21,7 @@ namespace SwiftFind
             string id = Environment.UserName;
             bool created;
             bool waitForPrevious = Array.IndexOf(args, "--wait-for-previous") >= 0;
+            StartHidden = Array.IndexOf(args, "--minimized") >= 0;
             using (var mutex = new Mutex(true, "SwiftFind.SingleInstance." + id, out created))
             using (var showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "SwiftFind.Show." + id))
             {
@@ -38,13 +42,15 @@ namespace SwiftFind
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
 
+                var prefs = SwiftFind.Models.AppSettings.Load();
+                Theme.Apply(prefs.ThemeMode, prefs.TextSizePercent);   // must happen before any window exists
                 var form = new MainForm();
                 RegisteredWaitHandle wait = null;
                 form.Shown += (s, e) =>
                 {
                     wait = ThreadPool.RegisterWaitForSingleObject(showEvent, (state, timedOut) =>
                     {
-                        try { if (!form.IsDisposed) form.BeginInvoke((Action)form.BringToFront2); } catch { }
+                        try { if (!form.IsDisposed) form.BeginInvoke((Action)(() => form.BringToFront2())); } catch { }
                     }, null, Timeout.Infinite, false);
                 };
                 Application.Run(form);

@@ -89,7 +89,7 @@ namespace SwiftFind
             if (File.Exists(f.FullPath) || Directory.Exists(f.FullPath)) return true;
             var r = MessageBox.Show(this, "This item no longer exists:\n" + f.FullPath + "\n\nRemove it from the index?",
                 "SwiftFind", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
-            if (r == DialogResult.Yes) { RemoveFromIndex(f.FullPath); ApplySearch(); }
+            if (r == DialogResult.Yes) { RemoveFromIndex(f.FullPath, f.IsDirectory); ApplySearch(); }
             return false;
         }
 
@@ -196,7 +196,7 @@ namespace SwiftFind
                         if (string.Equals(dest, src, StringComparison.OrdinalIgnoreCase)) continue; // already there
                         if (File.Exists(dest) || Directory.Exists(dest)) dest = FileOps.UniquePath(destDir, name);
                         FileOps.MoveItem(src, dest, isDir);
-                        RemoveFromIndex(src);
+                        RemoveFromIndex(src, isDir);
                     }
                     else
                     {
@@ -244,7 +244,7 @@ namespace SwiftFind
             {
                 if (f.IsDirectory) Directory.Move(f.FullPath, dest); else File.Move(f.FullPath, dest);
                 if (favorites.Remove(f.FullPath)) { favorites.Add(dest); SaveFavorites(); }
-                RemoveFromIndex(f.FullPath);
+                RemoveFromIndex(f.FullPath, f.IsDirectory);
                 AddToIndex(dest);
                 ApplySearch();
                 SetStatus("Renamed to " + newName);
@@ -261,10 +261,14 @@ namespace SwiftFind
             var sel = SelectedEntries();
             if (sel.Count == 0) return;
             string what = sel.Count == 1 ? "\"" + sel[0].Name + "\"" : sel.Count + " items";
-            var ans = MessageBox.Show(this, "Move " + what + " to the Recycle Bin?", "Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (ans != DialogResult.Yes) return;
+            if (settings.ConfirmDelete)
+            {
+                var ans = MessageBox.Show(this, "Move " + what + " to the Recycle Bin?", "Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (ans != DialogResult.Yes) return;
+            }
 
             int removed = 0; var errors = new List<string>();
+            var gone = new List<KeyValuePair<string, bool>>();
             foreach (var f in sel)
             {
                 try
@@ -272,13 +276,14 @@ namespace SwiftFind
                     if (File.Exists(f.FullPath) || Directory.Exists(f.FullPath)) FileOps.Recycle(f.FullPath, f.IsDirectory);
                     if (!File.Exists(f.FullPath) && !Directory.Exists(f.FullPath))
                     {
-                        RemoveFromIndex(f.FullPath);
+                        gone.Add(new KeyValuePair<string, bool>(f.FullPath, f.IsDirectory));
                         if (favorites.Remove(f.FullPath)) SaveFavorites();
                         removed++;
                     }
                 }
                 catch (Exception ex) { Log.Error("Delete " + f.FullPath, ex); errors.Add(f.Name + ": " + ex.Message); }
             }
+            if (gone.Count > 0) RemoveFromIndex(gone);   // one pass for the whole batch
             ApplySearch();
             SetStatus(removed + (removed == 1 ? " item moved to the Recycle Bin." : " items moved to the Recycle Bin."));
             if (errors.Count > 0) MessageBox.Show(this, string.Join("\n", errors.Take(8)), "Some items could not be deleted", MessageBoxButtons.OK, MessageBoxIcon.Warning);

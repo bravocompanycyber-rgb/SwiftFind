@@ -12,6 +12,23 @@ A ground-up quality pass: new design, new brand assets, many correctness fixes.
 - Window size, position, maximised state and sort order are remembered
 - Per-monitor high-DPI support (manifest + DPI-aware layout)
 
+### Drives that come and go
+- **Fixed:** the index kept listing a drive after it was removed, so searches showed files that weren't there until you rebuilt. SwiftFind now watches for plug/unplug events (plus a background check) and removes a drive's files the moment it disappears
+- Each drive is tracked with its volume serial number, so a *different* disk that gets the same drive letter is detected and re-indexed instead of showing the old disk's files
+- A newly connected drive is indexed on its own; nothing else is rebuilt
+- The saved index stays valid when drives change (it used to be thrown away entirely)
+- Cached files for drives that are no longer connected are dropped at startup
+
+### No more "Not responding"
+- Drive enumeration moved off the UI thread, with a per-drive timeout. Querying a dead network share or an empty card reader used to be able to stall the window
+- Indexing and the size/date pass now run at below-normal priority with limited parallelism (*Gentle / Balanced / Fast* in Preferences)
+- Background garbage collection enabled; the cache loader shares folder strings instead of allocating millions of copies
+- Batch deletes update the index in one pass; the window hides instantly on exit while data is saved
+
+### Settings
+- New settings window with seven pages (see README): drive picker, indexing effort, background refresh, hidden/system files, light theme and text size, date formats, double-click action, typing delay, hotkey presets, start with Windows / start hidden, name-based exclusions with suggestions, settings export / import / reset
+- Buttons grow with the text size so labels are never cut off
+
 ### Search everywhere
 - New default: SwiftFind indexes **all local drives** (optionally USB drives) into one index and searches them together — no folder to choose. A single folder is still available from *Search scope* or Preferences
 - Indexes automatically on first run, whenever the saved index doesn't match the chosen scope, and in the background at startup when the index is over 6 hours old (administrator + NTFS only, where refreshing takes seconds)
@@ -56,7 +73,7 @@ A ground-up quality pass: new design, new brand assets, many correctness fixes.
 - **Removed from git:** build output (`obj/`), compiled binaries and the `backups/` folder (still in history); added `.gitignore`
 - Builds now go to `bin/Release/net48` instead of the repository root
 - CI: restore-safe `dotnet build`, unit tests, version from tag, SHA-256 checksum. The icon is no longer regenerated (and overwritten) on every build
-- Unit tests for the search engine (44 cases)
+- Unit tests for the search engine, exclusion rules and the index cache (60 cases)
 
 ## 2.7.0 and earlier
 See git history.

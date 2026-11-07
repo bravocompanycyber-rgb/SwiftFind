@@ -8,6 +8,9 @@ namespace SwiftFind.Core
     {
         static string dataDir;
 
+        /// <summary>Tests point this at a temp folder so they never touch real user data.</summary>
+        public static string OverrideDataDir;
+
         public static bool IsPortable
         {
             get
@@ -21,6 +24,7 @@ namespace SwiftFind.Core
         {
             get
             {
+                if (OverrideDataDir != null) { try { Directory.CreateDirectory(OverrideDataDir); } catch { } return OverrideDataDir; }
                 if (dataDir != null) return dataDir;
                 string dir;
                 if (IsPortable)

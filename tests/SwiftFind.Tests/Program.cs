@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using SwiftFind.Core;
 using SwiftFind.Indexing;
+using SwiftFind.Services;
 using SwiftFind.Models;
 using SwiftFind.Search;
 
@@ -136,6 +138,48 @@ static class Program
         Check("filter: sibling with same prefix is NOT excluded", !pf.IsFolderExcluded(@"C:\Windows2\x"));
         Check("filter: unrelated", !pf.IsFolderExcluded(@"C:\Users"));
         Check("filter: extension", pf.IsExtensionExcluded(".TMP") && !pf.IsExtensionExcluded(".pdf"));
+
+        // folder-NAME rules (e.g. node_modules) match at any depth, with exact segment boundaries
+        var nf = new PathFilter(new[] { "node_modules", "$Recycle.Bin" }, null);
+        Check("name rule: nested", nf.IsFolderExcluded(@"C:\proj\app\node_modules"));
+        Check("name rule: below", nf.IsFolderExcluded(@"C:\proj\node_modules\lodash\src"));
+        Check("name rule: other drive", nf.IsFolderExcluded(@"D:\$Recycle.Bin\S-1-5"));
+        Check("name rule: similar name is NOT excluded", !nf.IsFolderExcluded(@"C:\proj\node_modules_backup\x"));
+        Check("name rule: plain folder fine", !nf.IsFolderExcluded(@"C:\proj\src"));
+
+        // hidden / system filtering
+        var hid = new List<FileEntry> { F(@"C:\a\visible.txt"), F(@"C:\a\secret.txt"), F(@"C:\a\sys.dll") };
+        hid[1].Flags = FileEntry.FlagHidden; hid[2].Flags = FileEntry.FlagSystem;
+        var hq = SearchEngine.Parse(""); hq.HideHidden = true;
+        var hres = SearchEngine.Execute(hid, hq, 100, SearchEngine.BuildComparison(0, true, false), CancellationToken.None);
+        Check("hidden filter hides hidden+system", hres.Items.Count == 1 && hres.Items[0].Name == "visible.txt");
+        Check("hidden shown by default", Run(hid, "").Count == 3);
+
+        // cache round trip (v4): entries, flags, per-drive identity
+        string tmp = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "swiftfind-test-" + Guid.NewGuid().ToString("N"));
+        AppPaths.OverrideDataDir = tmp;
+        try
+        {
+            var roots = new Dictionary<string, uint>(StringComparer.OrdinalIgnoreCase) { { @"C:\", 12345u }, { @"E:\", 777u } };
+            var src = new List<FileEntry> { F(@"C:\docs\a.txt", 42, "2026-05-05"), F(@"C:\docs\b.txt", 7), F(@"E:\usb", 0, "2026-01-01", true) };
+            src[1].Flags = FileEntry.FlagHidden;
+            IndexStore.Save("all", "mixed", new DateTime(2026, 11, 7), roots, src);
+            var snap = IndexStore.Load();
+            Check("cache: loads", snap != null);
+            if (snap != null)
+            {
+                Check("cache: scope + method", snap.Scope == "all" && snap.Method == "mixed");
+                Check("cache: drive identities kept", snap.Roots.Count == 2 && snap.Roots[@"E:\"] == 777u && snap.Roots[@"C:\"] == 12345u);
+                Check("cache: entry count", snap.Entries.Count == 3);
+                Check("cache: entry data", snap.Entries[0].FullPath == @"C:\docs\a.txt" && snap.Entries[0].Size == 42 && snap.Entries[0].Name == "a.txt" && snap.Entries[0].Directory == @"C:\docs");
+                Check("cache: hidden flag kept", snap.Entries[1].IsHidden && !snap.Entries[0].IsHidden);
+                Check("cache: directory flag kept", snap.Entries[2].IsDirectory);
+                Check("cache: folder strings are shared", object.ReferenceEquals(snap.Entries[0].Directory, snap.Entries[1].Directory));
+            }
+            System.IO.File.WriteAllBytes(AppPaths.CacheFile, new byte[] { 1, 2, 3 });
+            Check("cache: corrupt file is ignored, not fatal", IndexStore.Load() == null);
+        }
+        finally { try { System.IO.Directory.Delete(tmp, true); } catch { } AppPaths.OverrideDataDir = null; }
 
         Console.WriteLine(passed + " passed, " + failed + " failed");
         return failed == 0 ? 0 : 1;

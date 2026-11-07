@@ -9,6 +9,8 @@ SwiftFind indexes **everything on your PC** — every local drive (and USB drive
 
 ## Features
 
+- **Knows when drives come and go** — unplug a USB drive and its files vanish from the results at once; plug one in (or swap the disk behind a drive letter) and only that drive is indexed, no full rebuild
+- **Never freezes** — drive probing, indexing, loading and saving all run in the background at reduced priority
 - **Search everywhere by default** — all drives indexed automatically on first run, kept fresh in the background
 - **Instant search** while typing, on a background thread, so the window never freezes
 - **NTFS fast index** (MFT / USN) with automatic fallback to a folder scan
@@ -27,6 +29,20 @@ SwiftFind indexes **everything on your PC** — every local drive (and USB drive
 Grab `SwiftFind-portable-windows.zip` (or `SwiftFind.exe`) from the [Releases](../../releases) page. Requires Windows 7 or later with .NET Framework 4.8 (built into Windows 10 1903+ and Windows 11).
 
 > **Tip:** use *File → Restart as administrator* once to unlock the NTFS fast index (an entire drive in seconds). Without it SwiftFind still works, but scanning a whole drive takes minutes instead.
+
+## Settings
+
+*Tools → Preferences* has seven pages:
+
+| Page | What you can change |
+|---|---|
+| Drives & scope | everywhere vs one folder; include USB / network drives; tick individual drives to leave out; live drive list |
+| Indexing | indexing effort (Gentle / Balanced / Fast), background refresh interval, rebuild at startup, show hidden & system files, restart as administrator |
+| Search & results | result limit, typing delay, grouping, double-click action, date format, folders first, colour coding, full-path matching, confirm before delete |
+| Appearance | Dark / Light / follow Windows, text size (Small to Extra large) |
+| Startup & tray | start with Windows, start hidden, keep running in the tray, global hotkey (5 presets), clear search on hotkey |
+| Exclusions | folders by path or by name (`node_modules` skips every folder of that name), one-click suggestions, file extensions |
+| Maintenance | export / import / reset settings, open data folder, view error log |
 
 ## Search syntax
 

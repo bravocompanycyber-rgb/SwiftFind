@@ -46,6 +46,7 @@ namespace SwiftFind.Search
             public bool CaseSensitive;
             public bool FilesOnly;
             public bool FoldersOnly;
+            public bool HideHidden;             // hide hidden/system items
             public Func<FileEntry, bool> Extra; // extra UI-level predicate (e.g. favourites only)
             public string Error;                // set when the query itself is invalid
 
@@ -246,6 +247,7 @@ namespace SwiftFind.Search
         {
             var cmp = q.CaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
 
+            if (q.HideHidden && f.IsHidden) return false;
             if (q.FilesOnly && f.IsDirectory) return false;
             if (q.FoldersOnly && !f.IsDirectory) return false;
 

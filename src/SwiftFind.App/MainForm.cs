@@ -27,6 +27,7 @@ namespace SwiftFind
         string indexMethod = "none";
         DateTime indexBuiltAt = DateTime.MinValue;
         bool favoritesOnly;
+        bool skipSettingsSave;
         int sortColumn;
         bool sortAscending = true;
 
@@ -45,7 +46,7 @@ namespace SwiftFind
         ContextMenuStrip rowMenu;
         ToolStripMenuItem miFavorite, miRename, miPaste, miOpenWith;
         readonly Dictionary<string, ToolStripMenuItem> groupItems = new Dictionary<string, ToolStripMenuItem>();
-        ToolStripMenuItem miFoldersFirst, miColor, miMatchPath, miFavOnly, miScopeAll, miScopeFolder, miAdmin;
+        ToolStripMenuItem miFoldersFirst, miColor, miMatchPath, miFavOnly, miHidden, miScopeAll, miScopeFolder, miAdmin;
         ContextMenuStrip scopeMenu;
 
         static readonly string[] ColumnNames = { "Name", "Location", "Size", "Modified", "Type" };
@@ -72,10 +73,16 @@ namespace SwiftFind
             ApplyMenuState();
             UpdateHeaders();
 
-            debounce = new System.Windows.Forms.Timer { Interval = 90 };
+            debounce = new System.Windows.Forms.Timer { Interval = Math.Max(1, settings.SearchDelayMs) };
             debounce.Tick += (s, e) => { debounce.Stop(); ApplySearch(); };
 
-            Shown += (s, e) => { searchBox.Input.Focus(); SetupTrayAndHotkey(); LoadCacheThenMaybeIndex(); };
+            Shown += (s, e) =>
+            {
+                searchBox.Input.Focus();
+                SetupTrayAndHotkey();
+                if ((settings.StartMinimized || Program.StartHidden) && tray != null) Hide();   // start quietly in the tray
+                LoadCacheThenMaybeIndex();
+            };
             FormClosing += OnClosing;
         }
 
@@ -157,7 +164,8 @@ namespace SwiftFind
             miColor = Item("Colour-code results", Keys.None, (s, e) => { settings.ColorCode = !settings.ColorCode; settings.Save(); ApplyMenuState(); ApplySearch(); });
             miMatchPath = Item("Match full path", Keys.None, (s, e) => { settings.MatchPath = !settings.MatchPath; settings.Save(); ApplyMenuState(); ApplySearch(); });
             miFavOnly = Item("Favourites only", Keys.Control | Keys.B, (s, e) => ToggleFavoritesView());
-            view.DropDownItems.AddRange(new ToolStripItem[] { group, new ToolStripSeparator(), miFoldersFirst, miColor, miMatchPath, new ToolStripSeparator(), miFavOnly });
+            miHidden = Item("Show hidden and system items", Keys.None, (s, e) => { settings.ShowHidden = !settings.ShowHidden; settings.Save(); ApplyMenuState(); ApplySearch(); });
+            view.DropDownItems.AddRange(new ToolStripItem[] { group, new ToolStripSeparator(), miFoldersFirst, miColor, miMatchPath, miHidden, new ToolStripSeparator(), miFavOnly });
 
             var tools = new ToolStripMenuItem("Tools");
             tools.DropDownItems.AddRange(new ToolStripItem[]
@@ -186,6 +194,7 @@ namespace SwiftFind
             miFoldersFirst.Checked = settings.ShowFoldersFirst;
             miColor.Checked = settings.ColorCode;
             miMatchPath.Checked = settings.MatchPath;
+            miHidden.Checked = settings.ShowHidden;
             miFavOnly.Checked = favoritesOnly;
         }
 
@@ -254,14 +263,14 @@ namespace SwiftFind
                 SmallImageList = icons.Images, ShowItemToolTips = true, AllowColumnReorder = false
             };
             typeof(ListView).GetProperty("DoubleBuffered", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(resultsView, true, null);
-            Native.UseDarkControlTheme(resultsView);
+            if (Theme.IsDark) Native.UseDarkControlTheme(resultsView);
             resultsView.Columns.Add(ColumnNames[0], 330);
             resultsView.Columns.Add(ColumnNames[1], 400);
             resultsView.Columns.Add(ColumnNames[2], 95, HorizontalAlignment.Right);
             resultsView.Columns.Add(ColumnNames[3], 150);
             resultsView.Columns.Add(ColumnNames[4], 90);
             resultsView.ColumnClick += (s, e) => SortBy(e.Column);
-            resultsView.DoubleClick += (s, e) => OpenSelected();
+            resultsView.DoubleClick += (s, e) => { if (settings.DoubleClick == "Reveal") RevealSelected(); else OpenSelected(); };
             resultsView.KeyDown += ResultsKeyDown;
             resultsView.ItemDrag += OnItemDrag;
             resultsView.SelectedIndexChanged += (s, e) => UpdateSelectionStatus();
@@ -346,6 +355,7 @@ namespace SwiftFind
             }
             try
             {
+                Hide();   // vanish instantly; finish saving without a frozen-looking window
                 TeardownTrayAndHotkey();
                 CancelBackgroundWork();
                 var b = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
@@ -353,7 +363,7 @@ namespace SwiftFind
                 settings.WindowWidth = b.Width; settings.WindowHeight = b.Height;
                 settings.WindowMaximized = WindowState == FormWindowState.Maximized;
                 settings.SortColumn = sortColumn; settings.SortAscending = sortAscending;
-                settings.Save();
+                if (!skipSettingsSave) settings.Save();
                 FlushCacheIfDirty();
             }
             catch (Exception ex) { Log.Error("Closing", ex); }

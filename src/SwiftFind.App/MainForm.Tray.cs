@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using SwiftFind.Core;
 using SwiftFind.Helpers;
+using SwiftFind.Services;
 
 namespace SwiftFind
 {
@@ -10,6 +11,11 @@ namespace SwiftFind
     public partial class MainForm
     {
         const int HotkeyId = 0x5F1D;
+
+        public static readonly string[] HotkeyNames = { "Ctrl+Alt+Space", "Ctrl+Shift+Space", "Ctrl+Alt+F", "Win+Shift+F", "Ctrl+Alt+S" };
+        static readonly uint[] HotkeyMods = { Native.MOD_CONTROL | Native.MOD_ALT, Native.MOD_CONTROL | Native.MOD_SHIFT, Native.MOD_CONTROL | Native.MOD_ALT, Native.MOD_WIN | Native.MOD_SHIFT, Native.MOD_CONTROL | Native.MOD_ALT };
+        static readonly Keys[] HotkeyKeys = { Keys.Space, Keys.Space, Keys.F, Keys.F, Keys.S };
+
         NotifyIcon tray;
         bool exiting, hotkeyRegistered;
 
@@ -19,12 +25,13 @@ namespace SwiftFind
             if (hotkeyRegistered) { Native.UnregisterHotKeySafe(Handle, HotkeyId); hotkeyRegistered = false; }
             if (settings.GlobalHotkey)
             {
-                hotkeyRegistered = Native.TryRegisterHotKey(Handle, HotkeyId, Native.MOD_CONTROL | Native.MOD_ALT, Keys.Space);
-                if (!hotkeyRegistered) Log.Info("Global hotkey Ctrl+Alt+Space is unavailable (already used by another program).");
+                int p = Math.Max(0, Math.Min(HotkeyNames.Length - 1, settings.HotkeyPreset));
+                hotkeyRegistered = Native.TryRegisterHotKey(Handle, HotkeyId, HotkeyMods[p], HotkeyKeys[p]);
+                if (!hotkeyRegistered) { Log.Info("Global hotkey " + HotkeyNames[p] + " is unavailable (used by another program)."); SetStatus("The hotkey " + HotkeyNames[p] + " is already used by another program - pick a different one in Preferences."); }
             }
 
             // Tray icon: needed when closing to tray; also handy as a launcher, so it exists whenever either feature is on.
-            bool wantTray = settings.CloseToTray;
+            bool wantTray = settings.CloseToTray || settings.StartMinimized || Program.StartHidden;
             if (wantTray && tray == null)
             {
                 var menu = new ContextMenuStrip { Renderer = new DarkRenderer(), BackColor = Theme.Panel, ForeColor = Theme.Text, Font = Theme.Ui(9.5f) };
@@ -36,7 +43,7 @@ namespace SwiftFind
                 tray = new NotifyIcon
                 {
                     Icon = AppIcon.Load() ?? SystemIcons.Application,
-                    Text = "SwiftFind" + (hotkeyRegistered ? "  (Ctrl+Alt+Space)" : ""),
+                    Text = "SwiftFind" + (hotkeyRegistered ? "  (" + HotkeyNames[Math.Max(0, Math.Min(HotkeyNames.Length - 1, settings.HotkeyPreset))] + ")" : ""),
                     ContextMenuStrip = menu,
                     Visible = true
                 };
@@ -60,11 +67,11 @@ namespace SwiftFind
         {
             Hide();
             if (tray != null)
-                tray.ShowBalloonTip(1500, "SwiftFind is still running", "Press Ctrl+Alt+Space or click the tray icon to bring it back.", ToolTipIcon.None);
+                tray.ShowBalloonTip(1500, "SwiftFind is still running", (hotkeyRegistered ? "Press " + HotkeyNames[Math.Max(0, Math.Min(HotkeyNames.Length - 1, settings.HotkeyPreset))] + " or click" : "Click") + " the tray icon to bring it back.", ToolTipIcon.None);
         }
 
         /// <summary>Shows the window, restores it if minimised and focuses the search box.</summary>
-        public void BringToFront2()
+        public void BringToFront2(bool viaHotkey = false)
         {
             if (!Visible) Show();
             if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
@@ -72,15 +79,21 @@ namespace SwiftFind
             TopMost = true;   // reliably steals focus from other apps, then releases
             TopMost = false;
             searchBox.Input.Focus();
-            searchBox.Input.SelectAll();
+            if (viaHotkey && settings.ClearSearchOnHotkey) searchBox.Input.Clear(); else searchBox.Input.SelectAll();
         }
 
         protected override void WndProc(ref Message m)
         {
             if (m.Msg == Native.WM_HOTKEY && m.WParam.ToInt32() == HotkeyId)
             {
-                BringToFront2();
+                BringToFront2(true);
                 return;
+            }
+            if (m.Msg == Native.WM_DEVICECHANGE)
+            {
+                int ev = m.WParam.ToInt32();
+                if (ev == Native.DBT_DEVNODES_CHANGED || ev == Native.DBT_DEVICEARRIVAL || ev == Native.DBT_DEVICEREMOVECOMPLETE)
+                    DriveMonitor.Shared.NudgeSoon();   // a drive was plugged in or removed: re-check in the background
             }
             base.WndProc(ref m);
         }

@@ -39,6 +39,7 @@ namespace SwiftFind
         SearchEngine.Query BuildQuery()
         {
             var q = SearchEngine.Parse(searchBox.Input.Text, settings.MatchPath);
+            q.HideHidden = !settings.ShowHidden;
 
             string type = (string)cmbType.SelectedItem;
             if (type == "Folders") q.FoldersOnly = true;
@@ -152,6 +153,23 @@ namespace SwiftFind
             return i == 0 ? bytes.ToString("N0", CultureInfo.CurrentCulture) + " B" : v.ToString("0.#", CultureInfo.CurrentCulture) + " " + u[i];
         }
 
+        string FormatDate(DateTime d)
+        {
+            switch (settings.DateFormat)
+            {
+                case "System": return d.ToString("g", CultureInfo.CurrentCulture);
+                case "Relative":
+                    TimeSpan ago = DateTime.Now - d;
+                    if (ago.TotalSeconds < 0) return d.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+                    if (ago.TotalMinutes < 1) return "just now";
+                    if (ago.TotalMinutes < 60) return (int)ago.TotalMinutes + " min ago";
+                    if (ago.TotalHours < 24) return (int)ago.TotalHours + " h ago";
+                    if (ago.TotalDays < 30) return (int)ago.TotalDays + " d ago";
+                    return d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                default: return d.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+            }
+        }
+
         static string TypeText(FileEntry f)
         {
             if (f.IsDirectory) return "Folder";
@@ -203,7 +221,7 @@ namespace SwiftFind
                 var row = new ListViewItem(f.Name, icons.KeyFor(f)) { Tag = f, ToolTipText = f.FullPath };
                 row.SubItems.Add(f.Directory);
                 row.SubItems.Add(f.IsDirectory ? "" : FormatSize(f.Size));
-                row.SubItems.Add(f.Modified == DateTime.MinValue ? "" : f.Modified.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture));
+                row.SubItems.Add(f.Modified == DateTime.MinValue ? "" : FormatDate(f.Modified));
                 row.SubItems.Add(TypeText(f));
 
                 Color c = Theme.Text;

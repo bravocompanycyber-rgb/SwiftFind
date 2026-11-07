@@ -42,7 +42,7 @@ namespace SwiftFind.Indexing
             public ushort MaxMajorVersion;
         }
 
-        struct Rec { public ulong Parent; public string Name; public bool IsDir; }
+        struct Rec { public ulong Parent; public string Name; public bool IsDir; public byte Flags; }
 
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         static extern IntPtr CreateFile(string name, uint access, uint share, IntPtr sec, uint disp, uint flags, IntPtr template);
@@ -133,7 +133,8 @@ namespace SwiftFind.Indexing
                                 {
                                     Parent = parent,
                                     Name = Encoding.Unicode.GetString(buffer, offset + nameOff, nameLen),
-                                    IsDir = (attrs & 0x10) != 0
+                                    IsDir = (attrs & 0x10) != 0,
+                                    Flags = (byte)(attrs & 6)
                                 };
                                 total++;
                                 if (progress != null && (total % 20000) == 0) progress(total);
@@ -238,7 +239,8 @@ namespace SwiftFind.Indexing
                     Directory = parentPath,
                     Size = r.IsDir ? 0 : FileEntry.UnknownSize,
                     Modified = DateTime.MinValue,
-                    IsDirectory = r.IsDir
+                    IsDirectory = r.IsDir,
+                    Flags = r.Flags
                 });
             }
             return results;

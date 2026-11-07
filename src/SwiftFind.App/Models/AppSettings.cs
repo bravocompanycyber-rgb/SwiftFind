@@ -22,6 +22,21 @@ namespace SwiftFind.Models
         public bool ShowFoldersFirst = true;
         public string GroupBy = "None"; // None | Extension | Folder | Modified | Size
         public bool ColorCode = true;
+        public string ThemeMode = "Dark";            // Dark | Light | System
+        public int TextSizePercent = 100;             // 90 / 100 / 115 / 130
+        public string DateFormat = "Iso";             // Iso | System | Relative
+        public string DoubleClick = "Open";           // Open | Reveal
+        public bool ConfirmDelete = true;
+        public bool ShowHidden = true;                // hidden and system items in results
+        public bool StartWithWindows = false;
+        public bool StartMinimized = false;
+        public int SearchDelayMs = 90;
+        public int HotkeyPreset = 0;
+        public bool ClearSearchOnHotkey = false;
+        public string IndexPriority = "Balanced";     // Gentle | Balanced | Fast
+        public int AutoRefreshHours = 6;              // 0 = never
+        public bool IncludeNetwork = false;
+        public List<string> ExcludedDrives = new List<string>();
         public bool IndexAllDrives = true;      // search everywhere (all local drives) instead of one folder
         public bool IncludeRemovable = true;    // include USB / removable drives when searching everywhere
         public bool GlobalHotkey = true;   // Ctrl+Alt+Space brings SwiftFind to the front
@@ -57,6 +72,21 @@ namespace SwiftFind.Models
                         case "foldersfirst": s.ShowFoldersFirst = ParseBool(val, s.ShowFoldersFirst); break;
                         case "groupby": if (IsValidGroup(val)) s.GroupBy = val; break;
                         case "colorcode": s.ColorCode = ParseBool(val, s.ColorCode); break;
+                        case "theme": if (val == "Dark" || val == "Light" || val == "System") s.ThemeMode = val; break;
+                        case "textsize": s.TextSizePercent = Clamp(ParseInt(val, 100), 80, 160); break;
+                        case "dateformat": if (val == "Iso" || val == "System" || val == "Relative") s.DateFormat = val; break;
+                        case "doubleclick": if (val == "Open" || val == "Reveal") s.DoubleClick = val; break;
+                        case "confirmdelete": s.ConfirmDelete = ParseBool(val, s.ConfirmDelete); break;
+                        case "showhidden": s.ShowHidden = ParseBool(val, s.ShowHidden); break;
+                        case "startwithwindows": s.StartWithWindows = ParseBool(val, false); break;
+                        case "startminimized": s.StartMinimized = ParseBool(val, false); break;
+                        case "searchdelay": s.SearchDelayMs = Clamp(ParseInt(val, 90), 0, 1000); break;
+                        case "hotkeypreset": s.HotkeyPreset = Clamp(ParseInt(val, 0), 0, 4); break;
+                        case "clearonhotkey": s.ClearSearchOnHotkey = ParseBool(val, false); break;
+                        case "priority": if (val == "Gentle" || val == "Balanced" || val == "Fast") s.IndexPriority = val; break;
+                        case "autorefreshhours": s.AutoRefreshHours = Clamp(ParseInt(val, 6), 0, 168); break;
+                        case "includenetwork": s.IncludeNetwork = ParseBool(val, false); break;
+                        case "excludeddrive": if (!string.IsNullOrWhiteSpace(val)) s.ExcludedDrives.Add(val); break;
                         case "everywhere": s.IndexAllDrives = ParseBool(val, s.IndexAllDrives); break;
                         case "removable": s.IncludeRemovable = ParseBool(val, s.IncludeRemovable); break;
                         case "hotkey": s.GlobalHotkey = ParseBool(val, s.GlobalHotkey); break;
@@ -98,6 +128,21 @@ namespace SwiftFind.Models
                 sb.AppendLine("FoldersFirst=" + (ShowFoldersFirst ? "1" : "0"));
                 sb.AppendLine("GroupBy=" + GroupBy);
                 sb.AppendLine("ColorCode=" + (ColorCode ? "1" : "0"));
+                sb.AppendLine("Theme=" + ThemeMode);
+                sb.AppendLine("TextSize=" + TextSizePercent);
+                sb.AppendLine("DateFormat=" + DateFormat);
+                sb.AppendLine("DoubleClick=" + DoubleClick);
+                sb.AppendLine("ConfirmDelete=" + (ConfirmDelete ? "1" : "0"));
+                sb.AppendLine("ShowHidden=" + (ShowHidden ? "1" : "0"));
+                sb.AppendLine("StartWithWindows=" + (StartWithWindows ? "1" : "0"));
+                sb.AppendLine("StartMinimized=" + (StartMinimized ? "1" : "0"));
+                sb.AppendLine("SearchDelay=" + SearchDelayMs);
+                sb.AppendLine("HotkeyPreset=" + HotkeyPreset);
+                sb.AppendLine("ClearOnHotkey=" + (ClearSearchOnHotkey ? "1" : "0"));
+                sb.AppendLine("Priority=" + IndexPriority);
+                sb.AppendLine("AutoRefreshHours=" + AutoRefreshHours);
+                sb.AppendLine("IncludeNetwork=" + (IncludeNetwork ? "1" : "0"));
+                foreach (string d in ExcludedDrives.Distinct(StringComparer.OrdinalIgnoreCase)) sb.AppendLine("ExcludedDrive=" + d);
                 sb.AppendLine("Everywhere=" + (IndexAllDrives ? "1" : "0"));
                 sb.AppendLine("Removable=" + (IncludeRemovable ? "1" : "0"));
                 sb.AppendLine("Hotkey=" + (GlobalHotkey ? "1" : "0"));

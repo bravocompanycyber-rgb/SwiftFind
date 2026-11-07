@@ -12,6 +12,9 @@
     <Compile Include="..\..\src\SwiftFind.App\Search\SearchEngine.cs" Link="Linked\SearchEngine.cs" />
     <Compile Include="..\..\src\SwiftFind.App\Models\FileEntry.cs" Link="Linked\FileEntry.cs" />
     <Compile Include="..\..\src\SwiftFind.App\Indexing\PathFilter.cs" Link="Linked\PathFilter.cs" />
+    <Compile Include="..\..\src\SwiftFind.App\Services\IndexStore.cs" Link="Linked\IndexStore.cs" />
+    <Compile Include="..\..\src\SwiftFind.App\Core\AppPaths.cs" Link="Linked\AppPaths.cs" />
+    <Compile Include="..\..\src\SwiftFind.App\Core\Log.cs" Link="Linked\Log.cs" />
   </ItemGroup>
 
 </Project>

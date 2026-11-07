@@ -13,6 +13,11 @@ namespace SwiftFind.Models
         public long Size;
         public DateTime Modified;
         public bool IsDirectory;
+        /// <summary>Bit 2 = hidden, bit 4 = system (same values as the Windows file attributes).</summary>
+        public byte Flags;
+
+        public const byte FlagHidden = 2, FlagSystem = 4;
+        public bool IsHidden { get { return (Flags & (FlagHidden | FlagSystem)) != 0; } }
 
         public string Extension
         {

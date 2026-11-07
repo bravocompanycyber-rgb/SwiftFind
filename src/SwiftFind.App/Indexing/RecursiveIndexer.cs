@@ -50,7 +50,8 @@ namespace SwiftFind.Indexing
                                     Directory = dir.FullName,
                                     Size = 0,
                                     Modified = fsi.LastWriteTime,
-                                    IsDirectory = true
+                                    IsDirectory = true,
+                                    Flags = (byte)((int)fsi.Attributes & 6)
                                 });
                                 stack.Push((DirectoryInfo)fsi);
                             }
@@ -68,7 +69,8 @@ namespace SwiftFind.Indexing
                                     Directory = dir.FullName,
                                     Size = fi.Length,
                                     Modified = fi.LastWriteTime,
-                                    IsDirectory = false
+                                    IsDirectory = false,
+                                    Flags = (byte)((int)fi.Attributes & 6)
                                 });
                             }
 

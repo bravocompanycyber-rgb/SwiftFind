@@ -19,6 +19,9 @@ namespace SwiftFind.Controls
             FlatStyle = FlatStyle.Flat;
             FlatAppearance.BorderSize = 0;
             UseVisualStyleBackColor = false;
+            AutoSize = true;                       // grows when text size is increased, never shrinks below the set width
+            AutoSizeMode = AutoSizeMode.GrowOnly;
+            UseMnemonic = false;   // so "Drives & scope" shows the ampersand instead of underlining a letter
             Cursor = Cursors.Hand;
             Font = Theme.Ui(9.5f, FontStyle.Bold);
             ForeColor = Color.White;

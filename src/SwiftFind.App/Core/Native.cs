@@ -40,7 +40,7 @@ namespace SwiftFind.Core
         static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
         public const int WM_HOTKEY = 0x0312;
-        public const uint MOD_ALT = 0x1, MOD_CONTROL = 0x2, MOD_NOREPEAT = 0x4000;
+        public const uint MOD_ALT = 0x1, MOD_CONTROL = 0x2, MOD_SHIFT = 0x4, MOD_WIN = 0x8, MOD_NOREPEAT = 0x4000;
 
         public static bool TryRegisterHotKey(IntPtr hwnd, int id, uint modifiers, Keys key)
         {
@@ -51,6 +51,25 @@ namespace SwiftFind.Core
         public static void UnregisterHotKeySafe(IntPtr hwnd, int id)
         {
             try { UnregisterHotKey(hwnd, id); } catch { }
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern bool GetVolumeInformation(string root, System.Text.StringBuilder volName, int volNameSize,
+            out uint serial, out uint maxComponent, out uint flags, System.Text.StringBuilder fsName, int fsNameSize);
+
+        public const int WM_DEVICECHANGE = 0x0219;
+        public const int DBT_DEVNODES_CHANGED = 0x0007, DBT_DEVICEARRIVAL = 0x8000, DBT_DEVICEREMOVECOMPLETE = 0x8004;
+
+        /// <summary>Volume serial number (changes when a different disk uses the same drive letter). 0 if unknown.</summary>
+        public static uint GetVolumeSerial(string root)
+        {
+            try
+            {
+                uint serial, max, flags;
+                if (GetVolumeInformation(root, null, 0, out serial, out max, out flags, null, 0)) return serial;
+            }
+            catch { }
+            return 0;
         }
 
         const uint SHGFI_ICON = 0x100;
